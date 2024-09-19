@@ -2,6 +2,7 @@ local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local window = DrRayLibrary:Load("BLAIR | JiwooHUB", "Default")
 
 local tab1 = DrRayLibrary.newTab("Main")
+local tab2 = DrRayLibrary.newTab("Misc")
 
 -- Create the highlight effect
 local function createHighlight(part, fillColor, outlineColor, outlineTransparency)
@@ -44,7 +45,6 @@ local ghostLabelConnection
 
 local function toggleGhostLabels(enabled)
     if enabled then
-        -- Create new connection to add labels
         ghostLabelConnection = workspace.ChildAdded:Connect(function(child)
             if child.Name == "Ghost" and child:IsA("Model") then
                 child:WaitForChild("HumanoidRootPart")
@@ -52,14 +52,12 @@ local function toggleGhostLabels(enabled)
             end
         end)
 
-        -- Handle any existing Ghosts in the workspace at the time the script runs
         for _, child in pairs(workspace:GetChildren()) do
             if child.Name == "Ghost" and child:IsA("Model") then
                 addGhostLabel(child)
             end
         end
     else
-        -- Remove existing ghost labels
         for _, child in pairs(workspace:GetChildren()) do
             if child.Name == "Ghost" and child:IsA("Model") then
                 local humanoidRootPart = child:FindFirstChild("HumanoidRootPart")
@@ -72,7 +70,6 @@ local function toggleGhostLabels(enabled)
             end
         end
 
-        -- Disconnect the event to prevent further label additions
         if ghostLabelConnection then
             ghostLabelConnection:Disconnect()
             ghostLabelConnection = nil
@@ -203,19 +200,83 @@ end
 -- Maintain toggle state
 local ghostLabelToggle = false
 
+-- Full Bright logic
+local Lighting = game:GetService("Lighting")
+
+if not _G.FullBrightExecuted then
+    _G.FullBrightEnabled = false
+
+    _G.NormalLightingSettings = {
+        Brightness = Lighting.Brightness,
+        ClockTime = Lighting.ClockTime,
+        FogEnd = Lighting.FogEnd,
+        GlobalShadows = Lighting.GlobalShadows,
+        Ambient = Lighting.Ambient
+    }
+
+    local function setFullBright(enabled)
+        if enabled then
+            Lighting.Brightness = 1
+            Lighting.ClockTime = 12
+            Lighting.FogEnd = 786543
+            Lighting.GlobalShadows = false
+            Lighting.Ambient = Color3.fromRGB(178, 178, 178)
+        else
+            Lighting.Brightness = _G.NormalLightingSettings.Brightness
+            Lighting.ClockTime = _G.NormalLightingSettings.ClockTime
+            Lighting.FogEnd = _G.NormalLightingSettings.FogEnd
+            Lighting.GlobalShadows = _G.NormalLightingSettings.GlobalShadows
+            Lighting.Ambient = _G.NormalLightingSettings.Ambient
+        end
+    end
+
+    Lighting:GetPropertyChangedSignal("FogEnd"):Connect(function()
+        Lighting.FogEnd = 100000
+    end)
+
+    for _, v in ipairs(Lighting:GetDescendants()) do
+        if v:IsA("Atmosphere") then
+            v.Density = 0
+            v:GetPropertyChangedSignal("Density"):Connect(function()
+                v.Density = 0
+            end)
+        end
+    end
+
+    local LatestValue = true
+    spawn(function()
+        repeat wait() until _G.FullBrightEnabled
+        while wait() do
+            if _G.FullBrightEnabled ~= LatestValue then
+                setFullBright(_G.FullBrightEnabled)
+                LatestValue = not LatestValue
+            end
+        end
+    end)
+end
+
+_G.FullBrightExecuted = true
+
+-- TAB 1
 tab1.newToggle("Ghost", "Highlight the ghost!", false, function(toggleState)
     toggleGhosts(toggleState)
 end)
 
-tab1.newToggle("Ghost Label", "Add or remove labels above the ghost models!", false, function(toggleState)
+tab1.newToggle("Ghost Label", "Add or remove labels from ghosts", false, function(toggleState)
     ghostLabelToggle = toggleState
     toggleGhostLabels(toggleState)
 end)
 
-tab1.newToggle("Team", "Highlight other players!", false, function(toggleState)
+tab1.newToggle("Team Highlight", "Highlight teammates", false, function(toggleState)
     toggleTeamHighlight(toggleState)
 end)
 
-tab1.newToggle("Curse Objects", "Highlight cursed objects in the game!", false, function(toggleState)
+tab1.newToggle("Cursed Objects", "Highlight cursed objects", false, function(toggleState)
     toggleCursedObjects(toggleState)
+end)
+
+-- TAB 2
+tab2.newButton("Full Bright", "Toggle full bright effect", function()
+    _G.FullBrightEnabled = not _G.FullBrightEnabled
+    setFullBright(_G.FullBrightEnabled)
 end)
