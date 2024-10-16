@@ -1,5 +1,88 @@
 -- MADE BY JIWOO
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+
+-- FullBright Functionality
+if not _G.FullBrightExecuted then
+    _G.FullBrightExecuted = true
+    _G.FullBrightEnabled = false
+
+    -- Store normal lighting settings in a table
+    local NormalLightingSettings = {
+        Brightness = Lighting.Brightness,
+        ClockTime = Lighting.ClockTime,
+        FogEnd = Lighting.FogEnd,
+        GlobalShadows = Lighting.GlobalShadows,
+        Ambient = Lighting.Ambient
+    }
+
+    -- Set default lighting values
+    local function setFullBright()
+        Lighting.Brightness = 1
+        Lighting.ClockTime = 12
+        Lighting.FogEnd = 786543
+        Lighting.GlobalShadows = false
+        Lighting.Ambient = Color3.fromRGB(178, 178, 178)
+    end
+
+    local function resetProperties()
+        Lighting.Brightness = NormalLightingSettings.Brightness
+        Lighting.ClockTime = NormalLightingSettings.ClockTime
+        Lighting.FogEnd = NormalLightingSettings.FogEnd
+        Lighting.GlobalShadows = NormalLightingSettings.GlobalShadows
+        Lighting.Ambient = NormalLightingSettings.Ambient
+    end
+
+    -- Monitor Lighting property changes
+    local function monitorLightingProperty(propertyName, defaultValue)
+        Lighting:GetPropertyChangedSignal(propertyName):Connect(function()
+            if Lighting[propertyName] ~= defaultValue then
+                repeat wait() until _G.FullBrightEnabled
+                Lighting[propertyName] = defaultValue
+            end
+        end)
+    end
+
+    -- Monitor relevant lighting properties
+    monitorLightingProperty("Brightness", 1)
+    monitorLightingProperty("ClockTime", 12)
+    monitorLightingProperty("FogEnd", 786543)
+    monitorLightingProperty("GlobalShadows", false)
+    monitorLightingProperty("Ambient", Color3.fromRGB(178, 178, 178))
+
+    -- Handle Atmosphere instances
+    local function handleAtmosphere(instance)
+        if instance:IsA("Atmosphere") then
+            instance.Density = 0
+            instance:GetPropertyChangedSignal("Density"):Connect(function()
+                instance.Density = 0
+            end)
+        end
+    end
+
+    -- Set existing Atmosphere instances to density 0
+    for _, v in ipairs(Lighting:GetDescendants()) do
+        handleAtmosphere(v)
+    end
+
+    -- Handle new Atmosphere instances added to Lighting
+    Lighting.DescendantAdded:Connect(handleAtmosphere)
+
+    -- Toggle FullBright functionality
+    spawn(function()
+        while wait(1) do
+            if _G.FullBrightEnabled then
+                setFullBright()
+            else
+                resetProperties()
+            end
+        end
+    end)
+end
+
+-- Toggle the FullBright functionality
+_G.FullBrightEnabled = not _G.FullBrightEnabled
 
 -- Function to create a label above an object with slightly larger text
 local function createLabelWithLargerText(object, labelText, textColor)
@@ -8,18 +91,17 @@ local function createLabelWithLargerText(object, labelText, textColor)
         local textLabel = Instance.new("TextLabel")
 
         billboardGui.Adornee = object
-        billboardGui.Size = UDim2.new(0, 100, 0, 50) -- Adjusted size for BillboardGui
-        billboardGui.StudsOffset = Vector3.new(0, 3, 0) -- Position above the object
-        billboardGui.AlwaysOnTop = true -- Ensure it is always visible
+        billboardGui.Size = UDim2.new(0, 100, 0, 50)
+        billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+        billboardGui.AlwaysOnTop = true
 
         textLabel.Parent = billboardGui
-        textLabel.Size = UDim2.new(1, 0, 1, 0) -- Fill the BillboardGui
-        textLabel.BackgroundTransparency = 1 -- Make the background transparent
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundTransparency = 1
         textLabel.Text = labelText
         textLabel.TextColor3 = textColor
-        textLabel.TextScaled = false
         textLabel.Font = Enum.Font.SourceSans
-        textLabel.TextSize = 10 -- Set the text size
+        textLabel.TextSize = 10
 
         billboardGui.Parent = object
     else
@@ -30,10 +112,10 @@ end
 -- Ghost Highlight Loop
 local function maintainGhostHighlight()
     while true do
-        wait(0.5) -- Wait for a short duration to prevent a tight loop
+        wait(0.5)
         local ghostHighlight = workspace:FindFirstChild("Ghost") and workspace.Ghost:FindFirstChild("Highlight")
         if ghostHighlight then
-            ghostHighlight.Enabled = true -- Continuously set highlight to enabled
+            ghostHighlight.Enabled = true
         end
     end
 end
@@ -44,12 +126,11 @@ coroutine.wrap(maintainGhostHighlight)()
 -- Create labels with larger text for specific objects
 local function createLabels()
     local objects = {
-        {name = "Ouija Board", path = workspace, color = Color3.fromRGB(218, 165, 32), label = "Ouija"}, -- Bright Brown
-        {name = "SummoningCircle", path = workspace, color = Color3.fromRGB(255, 0, 0), label = "Summoning Circle"}, -- Bright Red
-        {name = "Tarot Cards", path = workspace.Map.Items, color = Color3.fromRGB(148, 0, 211), label = "Tarot"}, -- Bright Purple
+        {name = "Ouija Board", path = workspace, color = Color3.fromRGB(218, 165, 32), label = "Ouija"},
+        {name = "SummoningCircle", path = workspace, color = Color3.fromRGB(255, 0, 0), label = "Summoning Circle"},
+        {name = "Tarot Cards", path = workspace.Map.Items, color = Color3.fromRGB(148, 0, 211), label = "Tarot"},
     }
 
-    -- Create labels for predefined objects
     for _, obj in ipairs(objects) do
         local foundObject = obj.path:FindFirstChild(obj.name)
         if foundObject then
@@ -59,10 +140,9 @@ local function createLabels()
         end
     end
 
-    -- Create a label for GeneratorMesh
     local generatorMesh = workspace.Map.Generators:FindFirstChild("GeneratorMesh")
     if generatorMesh then
-        createLabelWithLargerText(generatorMesh, "Generator", Color3.fromRGB(255, 255, 255)) -- White color
+        createLabelWithLargerText(generatorMesh, "Generator", Color3.fromRGB(255, 255, 255))
     else
         warn("GeneratorMesh not found in workspace.Map.Generators")
     end
@@ -71,112 +151,74 @@ end
 -- Create labels for the specified objects
 createLabels()
 
--- FullBright Functionality
-if not _G.FullBrightExecuted then
-    _G.FullBrightExecuted = true
-    _G.FullBrightEnabled = false
+-- Player Highlighting
+local localPlayer = Players.LocalPlayer
+local playerHighlights = {}
 
-    -- Store normal lighting settings
-    _G.NormalLightingSettings = {
-        Brightness = Lighting.Brightness,
-        ClockTime = Lighting.ClockTime,
-        FogEnd = Lighting.FogEnd,
-        GlobalShadows = Lighting.GlobalShadows,
-        Ambient = Lighting.Ambient
-    }
-
-    -- Set default lighting values
-    Lighting.FogEnd = 786543
-    Lighting.Brightness = 1
-    Lighting.ClockTime = 12
-    Lighting.GlobalShadows = false
-    Lighting.Ambient = Color3.fromRGB(178, 178, 178)
-
-    -- Reset Lighting properties when FullBright is disabled
-    local function resetProperties()
-        Lighting.Brightness = _G.NormalLightingSettings.Brightness
-        Lighting.ClockTime = _G.NormalLightingSettings.ClockTime
-        Lighting.FogEnd = _G.NormalLightingSettings.FogEnd
-        Lighting.GlobalShadows = _G.NormalLightingSettings.GlobalShadows
-        Lighting.Ambient = _G.NormalLightingSettings.Ambient
-    end
-
-    -- Monitor Lighting property changes
-    Lighting:GetPropertyChangedSignal("Brightness"):Connect(function()
-        if Lighting.Brightness ~= 1 then
-            repeat wait() until _G.FullBrightEnabled
-            Lighting.Brightness = 1
-        end
-    end)
-
-    Lighting:GetPropertyChangedSignal("ClockTime"):Connect(function()
-        if Lighting.ClockTime ~= 12 then
-            repeat wait() until _G.FullBrightEnabled
-            Lighting.ClockTime = 12
-        end
-    end)
-
-    Lighting:GetPropertyChangedSignal("FogEnd"):Connect(function()
-        if Lighting.FogEnd ~= 786543 then
-            repeat wait() until _G.FullBrightEnabled
-            Lighting.FogEnd = 786543
-        end
-    end)
-
-    Lighting:GetPropertyChangedSignal("GlobalShadows"):Connect(function()
-        if Lighting.GlobalShadows ~= false then
-            repeat wait() until _G.FullBrightEnabled
-            Lighting.GlobalShadows = false
-        end
-    end)
-
-    Lighting:GetPropertyChangedSignal("Ambient"):Connect(function()
-        if Lighting.Ambient ~= Color3.fromRGB(178, 178, 178) then
-            repeat wait() until _G.FullBrightEnabled
-            Lighting.Ambient = Color3.fromRGB(178, 178, 178)
-        end
-    end)
-
-    -- Set Atmosphere density to 0 for existing instances
-    for _, v in ipairs(Lighting:GetDescendants()) do
-        if v:IsA("Atmosphere") then
-            v.Density = 0
-            v:GetPropertyChangedSignal("Density"):Connect(function()
-                v.Density = 0
-            end)
+local function highlightPlayer(player)
+    if player.Character and player ~= localPlayer then
+        if not playerHighlights[player] then
+            local highlight = Instance.new("Highlight")
+            highlight.FillColor = Color3.new(1, 1, 1)
+            highlight.OutlineColor = Color3.new(0, 0, 0)
+            highlight.OutlineTransparency = 0.9
+            highlight.Parent = player.Character
+            playerHighlights[player] = highlight
         end
     end
+end
 
-    -- Handle new Atmosphere instances added to Lighting
-    Lighting.DescendantAdded:Connect(function(v)
-        if v:IsA("Atmosphere") then
-            v.Density = 0
-            v:GetPropertyChangedSignal("Density"):Connect(function()
-                v.Density = 0
-            end)
-        end
+local function onPlayerAdded(player)
+    highlightPlayer(player)
+    
+    player.CharacterAdded:Connect(function()
+        highlightPlayer(player)
     end)
+end
 
-    -- Toggle FullBright functionality
-    local LatestValue = true
-    spawn(function()
-        repeat wait() until _G.FullBrightEnabled
-        while wait() do
-            if _G.FullBrightEnabled ~= LatestValue then
-                if not _G.FullBrightEnabled then
-                    resetProperties()
-                else
-                    Lighting.Brightness = 1
-                    Lighting.ClockTime = 12
-                    Lighting.FogEnd = 786543
-                    Lighting.GlobalShadows = false
-                    Lighting.Ambient = Color3.fromRGB(178, 178, 178)
-                end
-                LatestValue = not LatestValue
+for _, player in pairs(Players:GetPlayers()) do
+    onPlayerAdded(player)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Tpwalk Variables
+local ToggleTpwalk = false
+local TpwalkSpeed = 0.04
+local TpwalkConnection
+local playerHumanoid = localPlayer.Character and localPlayer.Character:WaitForChild("Humanoid")
+local playerHumanoidRootPart = localPlayer.Character and localPlayer.Character:WaitForChild("HumanoidRootPart")
+
+-- Function to handle Tpwalk
+local function startTpwalk()
+    if not ToggleTpwalk then return end
+
+    TpwalkConnection = RunService.RenderStepped:Connect(function()
+        if playerHumanoid and playerHumanoidRootPart then
+            local moveDirection = playerHumanoid.MoveDirection
+            if moveDirection.Magnitude > 0 then
+                playerHumanoidRootPart.CFrame = playerHumanoidRootPart.CFrame + (moveDirection * TpwalkSpeed)
             end
         end
     end)
 end
 
--- Toggle the FullBright functionality
-_G.FullBrightEnabled = not _G.FullBrightEnabled
+local function stopTpwalk()
+    if TpwalkConnection then
+        TpwalkConnection:Disconnect()
+        TpwalkConnection = nil
+    end
+end
+
+-- Toggle Function for Tpwalk
+local function toggleTpwalk()
+    ToggleTpwalk = not ToggleTpwalk
+    if ToggleTpwalk then
+        startTpwalk()
+    else
+        stopTpwalk()
+    end
+end
+
+-- Example of how to toggle Tpwalk (you can replace this with a UI button or keybind)
+toggleTpwalk()
