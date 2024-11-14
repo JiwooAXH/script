@@ -184,7 +184,7 @@ Players.PlayerAdded:Connect(onPlayerAdded)
 
 -- Tpwalk Variables
 local ToggleTpwalk = false
-local TpwalkSpeed = 1
+local TpwalkSpeed = 0.06
 local TpwalkConnection
 local playerHumanoid = localPlayer.Character and localPlayer.Character:WaitForChild("Humanoid")
 local playerHumanoidRootPart = localPlayer.Character and localPlayer.Character:WaitForChild("HumanoidRootPart")
