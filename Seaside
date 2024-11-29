@@ -1,0 +1,51 @@
+-- [MADE BY JIWOO]
+local player = game:GetService("Players").LocalPlayer
+local gui = player:WaitForChild("PlayerGui"):WaitForChild("FishingMinigame")
+local gameFrame = gui:WaitForChild("Game")
+local bar = gameFrame.Bar:WaitForChild("Bar")
+local fish = gameFrame.Bar:WaitForChild("Fish")
+local autoFishEnabled = false
+
+-- Function to make the bar follow the fish
+local function autoFollowFish()
+    while gui.Parent do
+        if autoFishEnabled then
+            -- Update the bar's position to follow the fish along the Y-axis
+            bar.Position = UDim2.new(bar.Position.X.Scale, bar.Position.X.Offset, fish.Position.Y.Scale, fish.Position.Y.Offset)
+        end
+        task.wait(0.01) 
+    end
+end
+
+-- Load DrRay library from GitHub
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+
+-- Create the window with title and theme
+local window = DrRayLibrary:Load("SyrHUB", "Default")
+
+-- Create the first tab with an image
+local tab1 = DrRayLibrary.newTab("Main", "ImageIdHere")
+
+-- Add labels and features to the tab
+tab1.newLabel("Fishing Feature")
+
+-- Toggle for enabling/disabling Auto Fish
+tab1.newToggle("Auto Fish", "Automatically follow the fish and play bar games", autoFishEnabled, function(toggleState)
+    autoFishEnabled = toggleState
+end)
+
+-- Add another label for Sell Feature section
+tab1.newLabel("Sell Feature")
+
+-- Button to sell all fish anywhere
+tab1.newButton("Sell Fish Anywhere", "Click to sell all your fish at any time", function()
+    local success, errorMsg = pcall(function()
+        game:GetService("ReplicatedStorage").Remotes.SellAllFish:InvokeServer()
+    end)
+    if not success then
+        warn("Failed to sell fish: " .. errorMsg)
+    end
+end)
+
+-- Start the auto-follow fish function
+autoFollowFish()
