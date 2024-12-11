@@ -1,0 +1,205 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local autoFishEnabled, clickFishEnabled = false, false
+
+-- Equip the fishing rod
+local function equipFishingRod() 
+    ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
+end
+
+-- Throw the fishing rod
+local function throwFishingRod() 
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+    task.wait(0.5)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+end
+
+-- Click fish in the mini-game
+local function clickFish() 
+    ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/RequestFishingMinigameClick"]:FireServer()
+end
+
+-- Load DrRay library from GitHub
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+local window = DrRayLibrary:Load("SyrHUB", "Default")
+local tab1 = DrRayLibrary.newTab("Main", "rbxassetid://10723407389")
+local tab2 = DrRayLibrary.newTab("Teleport", "rbxassetid://10723417608")
+
+-- Add labels
+tab1.newLabel("Fishing Features")
+tab2.newLabel("Teleport Features")
+
+-- Toggle for Auto Fishing
+tab1.newToggle("Auto Fishing", "Automatically throw rod", autoFishEnabled, function(state)
+    autoFishEnabled = state
+    if autoFishEnabled then
+        while autoFishEnabled do
+            equipFishingRod()
+            task.wait(1)
+            throwFishingRod()
+            task.wait()
+        end
+    end
+end)
+
+-- Toggle for Click Fish
+tab1.newToggle("Click Fish", "Automatically click fish", clickFishEnabled, function(state)
+    clickFishEnabled = state
+    if clickFishEnabled then
+        while clickFishEnabled do
+            clickFish()
+            task.wait()
+        end
+    end
+end)
+
+-- CFrame values for multiple NPCs
+local npcCFrames = {
+    ["NPC 1"] = CFrame.new(-31.0234871, 4.50000191, 2890.85815, -0.98615694, 7.75133344e-08, 0.165814728, 8.30064408e-08, 1, 2.61981512e-08, -0.165814728, 3.9599179e-08, -0.98615694),
+    ["NPC 2"] = CFrame.new(-669.128784, 16.0354481, 597.149597, 0.298862666, 9.19208745e-08, 0.954296112, -5.61033744e-08, 1, -7.87529828e-08, -0.954296112, -3.00029086e-08, 0.298862666)
+}
+
+-- Label for the selling shop
+tab2.newLabel("︲Selling Shop")
+
+-- Variable to store selected NPC
+local selectedNPC
+
+-- Teleport button that triggers the teleportation
+tab2.newButton("Teleport to Sell Merchant", "Choose at drop-down NPC to sell!", function()
+    if selectedNPC then
+        local targetCFrame = npcCFrames[selectedNPC]
+        if targetCFrame then
+            -- Teleport the player to the selected NPC's CFrame
+            game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(targetCFrame)
+        else
+            warn("Invalid NPC selected!")
+        end
+    else
+        warn("No NPC selected!")
+    end
+end)
+
+-- Dropdown for choosing the NPC
+tab2.newDropdown("Choose Sell Merchant", "Select one of these options!", {"NPC 1", "NPC 2"}, function(option1)
+    selectedNPC = option1
+    print("Selected NPC:", selectedNPC)
+end)
+
+-- SHOP
+local shopCFrames = {
+    ["Bait Shop"] = CFrame.new(71.1809921, 4.55437183, 2886.98169, -0.963526607, -1.44861334e-09, 0.267612606, -1.54522386e-08, 1, -5.02219599e-08, -0.267612606, -5.25254045e-08, -0.963526607),
+    ["Boat Shop"] = CFrame.new(-75.0152969, 4.75000191, 2866.22388, 0.0765710548, 7.53151213e-08, 0.997064114, 2.35507756e-08, 1, -7.73455042e-08, -0.997064114, 2.94040596e-08, 0.0765710548),
+    ["Rod Shop"] = CFrame.new(115.266884, 4.75000143, 2875.03735, -0.998590291, 4.52166526e-09, -0.053079769, 4.48759829e-09, 1, 7.60990382e-10, 0.053079769, 5.21716947e-10, -0.998590291)
+}
+
+-- Label for the shop
+tab2.newLabel("---")
+tab2.newLabel("︲Shop")
+
+-- Variable to store selected SHOP
+local selectedSHOP
+
+-- Teleport button that triggers the teleportation
+tab2.newButton("Teleport to Shop", "Choose at drop-down shop!", function()
+    if selectedSHOP then
+        local targetCFrame = shopCFrames[selectedSHOP]
+        if targetCFrame then
+            -- Teleport the player to the selected NPC's CFrame
+            game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(targetCFrame)
+        else
+            warn("Invalid SHOP selected!")
+        end
+    else
+        warn("No SHOP selected!")
+    end
+end)
+
+-- Dropdown for choosing the SHOP
+tab2.newDropdown("Choose Shop Merchant", "Select one of these options!", {"Bait Shop", "Boat Shop", "Rod Shop"}, function(option2)
+    selectedSHOP = option2
+    print("Selected SHOP:", selectedSHOP)
+end)
+
+-- ISLANDS
+local islandCFrames = {
+    ["Coral Reefs"] = CFrame.new(-2852.27271, 47.5, 2001.13989, -0.920495212, 2.2648079e-08, -0.390753865, 1.85641778e-08, 1, 1.42285002e-08, 0.390753865, 5.84324189e-09, -0.920495212),
+    ["Esoteric Depths"] = CFrame.new(2960.16235, -1302.72986, 1525.9447, 0.104714066, 5.45739542e-09, -0.994502366, 2.35625315e-08, 1, 7.96853161e-09, 0.994502366, -2.42674112e-08, 0.104714066),
+    ["Esoteric Island"] = CFrame.new(2030.39014, 27.3972206, 1391.28235, -0.154840887, -5.76084069e-08, 0.987939417, -5.58548656e-08, 1, 4.95574817e-08, -0.987939417, -4.75076973e-08, -0.154840887),
+    ["Kohana"] = CFrame.new(-640.953613, 16.0354481, 610.260376, -0.998687148, -2.4263505e-08, 0.0512243211, -2.64525184e-08, 1, -4.20559267e-08, -0.0512243211, -4.33557261e-08, -0.998687148),
+    ["Kohana Volcano"] = CFrame.new(-570.938354, 38.5660248, 123.664619, -0.655658722, -5.56722046e-09, -0.755057395, -2.37248154e-09, 1, -5.31308286e-09, 0.755057395, -1.69220948e-09, -0.655658722),
+    ["Volcano Entrance"] = CFrame.new(-329.435638, 12.250061, 279.027039, -0.0106023261, 3.89479453e-08, -0.999943793, -1.1038928e-07, 1, 4.0120586e-08, 0.999943793, 1.1080845e-07, -0.0106023261),
+    ["Stingray Shores"] = CFrame.new(22.0580654, 4.62500095, 2866.47925, 0.994904101, -5.93878191e-08, 0.100825779, 6.05639201e-08, 1, -8.60368488e-09, -0.100825779, 1.4666246e-08, 0.994904101),
+    ["Sparkling Cove"] = CFrame.new(215.248062, 2.74999976, 3003.65039, 0.151877373, -5.28299904e-10, 0.988399327, -1.29255695e-09, 1, 7.3311468e-10, -0.988399327, -1.38890599e-09, 0.151877373)
+}
+
+-- Label for the islands
+tab2.newLabel("---")
+tab2.newLabel("︲Island")
+
+-- Variable to store selected ISLANDS
+local selectedISLAND
+
+-- Teleport button that triggers the teleportation
+tab2.newButton("Teleport to Island", "Choose at drop-down Islands!", function()
+    if selectedISLAND then
+        local targetCFrame = islandCFrames[selectedISLAND]
+        if targetCFrame then
+            -- Teleport the player to the selected NPC's CFrame
+            game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(targetCFrame)
+        else
+            warn("Invalid ISLAND selected!")
+        end
+    else
+        warn("No ISLAND selected!")
+    end
+end)
+
+-- Dropdown for choosing the ISLANDS
+tab2.newDropdown("Choose Island", "Select one of these options!", {"Coral Reefs", "Esoteric Depths", "Esoteric Island", "Kohana", "Kohana Volcano", "Volcano Entrance", "Stingray Shores", "Sparkling Cove"}, function(option3)
+    selectedISLAND = option3
+    print("Selected ISLAND:", selectedISLAND)
+end)
+
+-- Label for the NPC
+tab2.newLabel("---")
+tab2.newLabel("︲Interactable NPC")
+
+-- Get all NPC names from workspace.NPC
+local npcNames = {}
+for _, npc in pairs(workspace.NPC:GetChildren()) do
+    if npc:IsA("Model") then  -- Ensure it's a model
+        table.insert(npcNames, npc.Name)
+    end
+end
+
+-- Variable to store selected NPC
+local selectedNPC
+
+-- Teleport button that triggers the teleportation
+tab2.newButton("Teleport to NPC", "Teleport to the selected NPC!", function()
+    if selectedNPC then
+        local npc = workspace.NPC:FindFirstChild(selectedNPC)
+        if npc then
+            -- Teleport the player to the selected NPC's position
+            game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(npc.HumanoidRootPart.CFrame)
+        else
+            warn("NPC not found!")
+        end
+    else
+        warn("No NPC selected!")
+    end
+end)
+
+-- Dropdown for choosing the NPC
+tab2.newDropdown("Choose NPC", "Select one of these options!", npcNames, function(option)
+    selectedNPC = option
+    print("Selected NPC:", selectedNPC)
+end)
+
+tab2.newLabel("---")
+tab2.newLabel("--")
+tab2.newLabel("-")
+
+
