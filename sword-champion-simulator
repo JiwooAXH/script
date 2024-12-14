@@ -1,0 +1,229 @@
+-- MADE BY JIWOO
+-- Required Services
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local dropsFolder = workspace.Game.Interactive.Drops
+local tweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local isAutoClicking = false -- Removed
+local collectDropsEnabled = false -- Default state for loot collection toggle
+local isAttacking = false  -- Default state for auto-attacking
+local selectedEggName = "Basic Egg" -- Default selected egg
+
+-- Function to collect all drops
+local function collectDrops()
+    -- Only collect drops if the toggle is enabled
+    if collectDropsEnabled then
+        -- Get all drops
+        local drops = dropsFolder:GetChildren()
+
+        -- Create a tween for each drop
+        for _, drop in ipairs(drops) do
+            if drop:IsA("BasePart") then
+                -- Create a tween goal to move the drop to the character's position
+                local goal = {}
+                goal.Position = character.HumanoidRootPart.Position
+
+                -- Tween information with a faster duration
+                local tweenInfo = TweenInfo.new(
+                    0.2, -- Faster duration (0.2 seconds)
+                    Enum.EasingStyle.Linear, -- Easing style for smooth movement
+                    Enum.EasingDirection.InOut, -- Easing direction
+                    0, -- Repeat count (0 for no repeat)
+                    false -- Reverse the tween (false for one-way movement)
+                )
+
+                -- Create the tween
+                local tween = tweenService:Create(drop, tweenInfo, goal)
+
+                -- Play the tween to move the drop
+                tween:Play()
+            end
+        end
+    end
+end
+
+-- Function to start/stop collecting drops based on the toggle
+local function toggleCollectDrops(state)
+    collectDropsEnabled = state -- Update the toggle state
+    if collectDropsEnabled then
+        print("Loot drops collection started")
+    else
+        print("Loot drops collection stopped")
+    end
+end
+
+-- Function to find the nearest enemy in all areas (including DungeonEnemies)
+local function getNearestEnemy()
+    local nearestEnemy = nil
+    local nearestDistance = math.huge  -- Set to a large number initially
+
+    -- Loop through all the areas under 'Enemies' folder
+    for _, area in ipairs(workspace.Game.Interactive.Enemies:GetChildren()) do
+        if area:IsA("Folder") then
+            -- Loop through all the enemies in the current area
+            for _, enemy in ipairs(area:GetChildren()) do
+                if enemy:IsA("Model") then
+                    local enemyRootPart = enemy:FindFirstChild("HumanoidRootPart")
+                    if enemyRootPart then
+                        -- Calculate the distance between the player's character and the enemy
+                        local distance = (character.HumanoidRootPart.Position - enemyRootPart.Position).magnitude
+                        if distance < nearestDistance then
+                            nearestDistance = distance
+                            nearestEnemy = enemy
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Now, check enemies in the DungeonEnemies folder
+    for _, enemy in ipairs(workspace.Game.Interactive.DungeonEnemies:GetChildren()) do
+        if enemy:IsA("Model") then
+            local enemyRootPart = enemy:FindFirstChild("HumanoidRootPart")
+            if enemyRootPart then
+                -- Calculate the distance between the player's character and the enemy
+                local distance = (character.HumanoidRootPart.Position - enemyRootPart.Position).magnitude
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearestEnemy = enemy
+                end
+            end
+        end
+    end
+
+    return nearestEnemy
+end
+
+-- Function to start or stop attacking based on the toggle state
+local function toggleAttack(state)
+    isAttacking = state  -- Update the toggle state
+    if isAttacking then
+        print("Auto attacking started")
+        -- Start auto attacking when the toggle is enabled
+        while isAttacking do
+            -- Find the nearest enemy in all areas
+            local nearestEnemy = getNearestEnemy()
+
+            if nearestEnemy then
+                local enemyId = nearestEnemy.Name  -- Use the enemy's name as the unique ID
+                
+                -- Fire the server event to attack the nearest enemy
+                ReplicatedStorage.Resources.Comm.RE.Attack:FireServer({"AttackEnemy", enemyId})
+            end
+
+            -- Wait for a short interval before repeating
+            wait()  -- Adjust the interval as needed
+        end
+    else
+        print("Auto attacking stopped")
+    end
+end
+
+-- Function to hatch the selected egg
+local function hatchEgg()
+    if selectedEggName then
+        -- Invoke the server event to hatch the selected egg (no "Spawn" part needed)
+        ReplicatedStorage.Resources.Comm.RF.Pet:InvokeServer({"HatchEgg", selectedEggName, {}})
+        print("Opening egg: " .. selectedEggName)
+    else
+        print("No egg selected!")
+    end
+end
+
+-- Function to start/stop egg opening based on the toggle
+local function toggleOpenEgg(state)
+    isOpeningEgg = state -- Update the egg-opening toggle state
+    if isOpeningEgg then
+        -- Start opening the egg when the toggle is enabled
+        while isOpeningEgg do
+            hatchEgg()
+            task.wait(1) -- Wait for 1 second before opening again (you can adjust this delay)
+        end
+        print("Egg opening started")
+    else
+        print("Egg opening stopped")
+    end
+end
+
+-- Continuously check the state of the collect drops toggle and collect drops if enabled
+game:GetService("RunService").Heartbeat:Connect(function()
+    collectDrops() -- Keep checking if the state is true and collect drops accordingly
+end)
+
+-- Load DrRay library from GitHub
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+local window = DrRayLibrary:Load("SyrHUB", "Default")
+local tab1 = DrRayLibrary.newTab("Main", "rbxassetid://10723407389")
+local tab2 = DrRayLibrary.newTab("Egg", "rbxassetid://10723345518")
+
+-- Add labels
+tab1.newLabel("Auto Features")
+tab2.newLabel("Open Features")
+
+-- Auto Attack Toggle
+tab1.newToggle("Train & Attack", "Automatically attack the nearest enemy!", false, function(state)
+    toggleAttack(state) -- Call the toggle function when the button is pressed
+end)
+
+-- Loot Drops Toggle
+tab1.newToggle("Loot Drops", "Automatically collect drops!", false, function(state)
+    toggleCollectDrops(state) -- Call the toggle function when the button is pressed
+end)
+
+tab1.newLabel("---")
+tab1.newLabel("Quests")
+
+-- Toggle for Auto Claim Quest
+tab1.newToggle("Claim Quest", "Automatically claim quests!", false, function(state)
+    autoClaiming = state -- Update the state of auto-claiming
+
+    if autoClaiming then
+        -- Start auto-claiming quests when enabled
+        while autoClaiming do
+            for i = 1, 2 do
+                game:GetService("ReplicatedStorage").Resources.Comm.RF.Quest:InvokeServer({"Claim", i})
+            end
+            task.wait(0.5)  -- Adjust interval as needed
+        end
+    end
+end)
+
+tab1.newLabel("---")
+tab1.newLabel("Gifts")
+
+-- Toggle for Auto Claim Gifts
+tab1.newToggle("Claim Gifts", "Automatically claim gifts!", false, function(state)
+    local giftClaiming = state -- Update the state of gift claiming
+
+    if giftClaiming then
+        -- Start auto-claiming gifts when enabled
+        while giftClaiming do
+            for i = 1, 10 do  -- Loop through gifts 1 to 10
+                game:GetService("ReplicatedStorage").Resources.Comm.RF.Gift:InvokeServer({"Collect", i})
+            end
+            task.wait(1)  -- Adjust interval as needed
+        end
+    end
+end)
+
+-- Dropdown for selecting an egg
+local eggNames = {}
+local eggFolder = workspace.Game.Interactive.Eggs
+for _, egg in ipairs(eggFolder:GetChildren()) do
+    if egg:IsA("Model") then
+        table.insert(eggNames, egg.Name)  -- Add egg name to the list
+    end
+end
+
+tab2.newDropdown("Choose Egg", "Select one of these options!", eggNames, function(selectedOption)
+    selectedEggName = selectedOption
+    print("Selected Egg: " .. selectedEggName)
+end)
+
+-- Toggle to open the egg
+tab2.newToggle("Open Egg", "Automatically open egg!", false, function(state)
+    toggleOpenEgg(state) -- Call the toggle function when the toggle is pressed
+end)
