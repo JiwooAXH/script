@@ -1,0 +1,90 @@
+-- MADE BY JIWOO
+local player = game:GetService("Players").LocalPlayer
+local gui = player.PlayerGui.SlideMinigame
+local bar = gui.MinigameBar.Bar
+local line = gui.MinigameBar.Line
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Create a tween info with a small duration (to simulate a 5ms update)
+local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true)
+
+-- Initialize state variables
+local autoReel = false
+local autoCast = false
+local autoShake = false
+local heartbeatConnection = nil  -- Variable to store the heartbeat connection
+
+-- Function to handle the autoReel logic
+local function autoReelFunction(state)
+    autoReel = state -- Set autoReel to true or false based on the toggle state
+
+    -- If autoReel is true, continuously move the bar
+    if autoReel then
+        -- Ensure the heartbeat connection is created only once
+        if not heartbeatConnection then
+            heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                local goal = {}
+                goal.Position = line.Position
+
+                local tween = TweenService:Create(bar, tweenInfo, goal)
+                tween:Play()
+                tween.Completed:Wait()
+            end)
+        end
+    else
+        -- If autoReel is false, stop the tween and reset the bar position
+        if heartbeatConnection then
+            heartbeatConnection:Disconnect()  -- Disconnect the heartbeat connection
+            heartbeatConnection = nil  -- Reset the connection variable
+        end
+        bar.Position = line.Position  -- Reset the bar position
+    end
+end
+
+-- Function to handle the autoCast logic
+local function autoCastFunction(state)
+    autoCast = state 
+
+    if autoCast then
+        while autoCast do
+            ReplicatedStorage.Remotes.FishSystem.CastEvent:FireServer(true, 0.9477323474711233) -- Cast
+            wait(0.1) 
+        end
+    end
+end
+
+-- Function to handle the autoShake logic
+local function autoShakeFunction(state)
+    autoShake = state 
+
+    if autoShake then
+        while autoShake do
+            ReplicatedStorage.Remotes.FishSystem.ClickEvent:FireServer() -- Shake
+            wait() 
+        end
+    end
+end
+
+-- Load DrRay library from GitHub
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+local window = DrRayLibrary:Load("SyrHUB", "Default")
+local tab1 = DrRayLibrary.newTab("Main", "rbxassetid://10723407389")
+
+-- Add labels and toggle buttons
+tab1.newLabel("Auto Fishing")
+
+-- Cast Toggle
+tab1.newToggle("Cast", "Auto cast your fishing line!!", false, function(state)
+    autoCastFunction(state)
+end)
+
+-- Shake Toggle
+tab1.newToggle("Shake", "Instantly lure fish!!", false, function(state)
+    autoShakeFunction(state)
+end)
+
+-- Reel Toggle
+tab1.newToggle("Reel", "Auto-reel the fishing minigame!", false, function(state)
+    autoReelFunction(state) 
+end)
