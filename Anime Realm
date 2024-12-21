@@ -1,0 +1,62 @@
+-- Variable to store the selected stat and training state
+local selectedStat = "Sword" -- Default stat to train
+local isTraining = false -- Tracks whether the training loop is active
+local isSpeedTraining = false
+local isAgilityTraining = false
+
+-- Function to train the selected stat
+local function autoTrain()
+    while isTraining do
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.InputService.RF.TrainStat:InvokeServer(selectedStat)
+        task.wait()
+    end
+end
+
+local function trainStat(stat)
+    while (stat == "Speed" and isSpeedTraining) or (stat == "Agility" and isAgilityTraining) do
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.InputService.RF.TrainStat:InvokeServer(stat)
+        task.wait()
+    end
+end
+
+-- Load DrRay library from GitHub
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+local window = DrRayLibrary:Load("SyrHUB", "Default")
+local tab1 = DrRayLibrary.newTab("Main", "rbxassetid://10723407389")
+
+-- UI Elements
+tab1.newLabel("Auto Train")
+
+-- Toggle button for auto-training
+tab1.newToggle("Train", "Choose stats you want to train below", false, function(state)
+    isTraining = state
+    if isTraining then
+        task.spawn(autoTrain)
+    end
+end)
+
+-- Dropdown menu for selecting stats
+tab1.newDropdown("Stats", "Select one of these options!", {"Strength", "Durability", "Sword"}, function(selectedOption)
+    selectedStat = selectedOption
+    print("Selected Stat:", selectedStat)
+end)
+
+tab1.newLabel("---") -- Separator label
+
+tab1.newToggle("Speed", "Auto train speed", false, function(state)
+    isSpeedTraining = state
+    if isSpeedTraining then
+        task.spawn(function()
+            trainStat("Speed")
+        end)
+    end
+end)
+
+tab1.newToggle("Agility", "Auto train agility", false, function(state)
+    isAgilityTraining = state
+    if isAgilityTraining then
+        task.spawn(function()
+            trainStat("Agility")
+        end)
+    end
+end)
