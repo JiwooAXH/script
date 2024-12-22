@@ -19,6 +19,14 @@ local function trainStat(stat)
     end
 end
 
+local questers = workspace.Questers:GetChildren()
+local npcNames = {}
+
+-- Populate the dropdown with NPC names
+for _, npc in pairs(questers) do
+    table.insert(npcNames, npc.Name)
+end
+
 -- Load DrRay library from GitHub
 local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
 local window = DrRayLibrary:Load("SyrHUB", "Default")
@@ -104,7 +112,7 @@ for _, area in ipairs(teleportAreas) do
     table.insert(teleportNames, area.name)
 end
 
-tab2.newDropdown("Teleport", "Select where you want to teleport!", teleportNames, function(selectedOption)
+tab2.newDropdown("Choose training area:", "Select where you want to teleport!", teleportNames, function(selectedOption)
     for _, area in ipairs(teleportAreas) do
         if area.name == selectedOption then
             selectedPosition = area.position
@@ -125,5 +133,18 @@ tab2.newButton("Teleport", "Teleport to the selected location!", function()
         end
     else
         print("No teleport position selected.")
+    end
+end)
+
+tab2.newLabel("---")
+
+tab2.newDropdown("Choose Quest NPC", "Select an NPC to teleport to", npcNames, function(selectedOption)
+    selectedNPC = selectedOption
+end)
+
+tab2.newButton("TP to NPC", "Teleport to selected NPC", function()
+    local npc = workspace.Questers:FindFirstChild(selectedNPC)
+    if npc then
+        game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(npc.HumanoidRootPart.CFrame)
     end
 end)
