@@ -23,9 +23,11 @@ end
 local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
 local window = DrRayLibrary:Load("SyrHUB", "Default")
 local tab1 = DrRayLibrary.newTab("Main", "rbxassetid://10723407389")
+local tab2 = DrRayLibrary.newTab("Areas", "rbxassetid://10723417608")
 
 -- UI Elements
 tab1.newLabel("Auto Train")
+tab2.newLabel("Teleport")
 
 -- Toggle button for auto-training
 tab1.newToggle("Train", "Choose stats you want to train below", false, function(state)
@@ -58,5 +60,70 @@ tab1.newToggle("Agility", "Auto train agility", false, function(state)
         task.spawn(function()
             trainStat("Agility")
         end)
+    end
+end)
+
+local selectedPosition = nil -- Variable to store the selected teleport position
+
+-- Table to store teleport areas
+local teleportAreas = {
+    {name = "STR - REQ: 100", position = CFrame.new(-201.471008, 238.420731, -2185.15747, 0.944066107, 1.48847712e-09, 0.32975626, -1.19506083e-09, 1, -1.09250609e-09, -0.32975626, 6.37319197e-10, 0.944066107)},
+    {name = "DURA - REQ: 100", position = CFrame.new(-317.906097, 238.627594, -2178.04126, -0.760191262, 6.19893044e-08, 0.64969939, -1.12819567e-08, 1, -1.08612923e-07, -0.64969939, -8.98964743e-08, -0.760191262)},
+    {name = "CHAKRA - REQ: 100", position = CFrame.new(-302.673279, 238.855911, -1897.60803, -0.45344162, 4.44018404e-08, -0.891285956, 5.37639044e-09, 1, 4.70824872e-08, 0.891285956, 1.65572587e-08, -0.45344162)},
+    {name = "SWORD - REQ: 100", position = CFrame.new(-202.027496, 238.700577, -1897.15808, -0.0302203298, 6.4343169e-08, 0.99954325, -6.96788476e-08, 1, -6.64792523e-08, -0.99954325, -7.16560464e-08, -0.0302203298)},
+    {name = "AGILITY - REQ: 100", position = CFrame.new(402.391724, 242.619446, -3260.07886, 0.993776798, -3.64952832e-08, -0.111389622, 3.90940613e-08, 1, 2.11463931e-08, 0.111389622, -2.53694665e-08, 0.993776798)},
+    {name = "SPEED - REQ: 100", position = CFrame.new(-253.03804, 241.874344, -1719.72229, 0.992285252, 2.73600822e-08, -0.12397562, -2.78954886e-08, 1, -2.582772e-09, 0.12397562, 6.02120709e-09, 0.992285252)},
+    {name = "STR - REQ: 10K", position = CFrame.new(-251.938522, 238.574112, -2385.3894, 0.816782773, 6.4452351e-08, 0.576945364, -1.6934365e-08, 1, -8.77390818e-08, -0.576945364, 6.18935658e-08, 0.816782773)},
+    {name = "DURA - REQ: 10K", position = CFrame.new(-82.2209015, 238.775665, -2717.38257, 3.37445294e-06, 4.08599234e-08, -1, -9.82427082e-08, 1, 4.08595895e-08, 1, 9.82425661e-08, 3.37445294e-06)},
+    {name = "CHAKRA -REQ: 15K", position = CFrame.new(972.665649, 248.829086, -2822.22705, 0.707134247, -1.25731751e-23, -0.707079291, 2.98828999e-23, 1, 1.21033761e-23, 0.707079291, -2.96882911e-23, 0.707134247)},
+    {name = "AGILITY & SPEED - REQ: 10K", position = CFrame.new(-11829.2832, 617.252625, 42503.4102, 0.0819232315, -2.48323175e-08, 0.996638656, 6.99051412e-08, 1, 1.91698994e-08, -0.996638656, 6.80997019e-08, 0.0819232315)},
+    {name = "STR - REQ: 100K", position = CFrame.new(-644.822449, 237.600281, -2102.52124, 0.087276347, 1.18304433e-08, 0.996184111, 3.849292e-09, 1, -1.22129977e-08, -0.996184111, 4.90050933e-09, 0.087276347)},
+    {name = "DURA - REQ: 100K", position = CFrame.new(-1134.26062, 324.978638, -208.391006, -0.834760785, -3.27488188e-08, -0.550612748, -4.63956304e-08, 1, 1.08614131e-08, 0.550612748, 3.46127074e-08, -0.834760785)},
+    {name = "CHAKRA - REQ: 150K", position = CFrame.new(-879.435242, 340.487427, -2458.8645, -0.255710363, 1.31146916e-08, -0.966753423, -1.79745019e-08, 1, 1.83200353e-08, 0.966753423, 2.20615348e-08, -0.255710363)},
+    {name = "AGILITY & SPEED - REQ: 100K", position = CFrame.new(-1946.89978, 237.152039, -2550.45654, 0.951672912, -8.31606339e-09, 0.307113409, -3.15093232e-08, 1, 1.24718198e-07, -0.307113409, -1.28367873e-07, 0.951672912)},
+    {name = "STR - REQ: 1M", position = CFrame.new(-1847.08606, 298.598785, -1595.86157, -0.345270455, 7.04100103e-08, 0.938503206, 6.52334009e-08, 1, -5.10246991e-08, -0.938503206, 4.36044338e-08, -0.345270455)},
+    {name = "DURA - REQ: 1M", position = CFrame.new(1076.61426, 323.104218, -1640.52332, 0.0135048851, -2.45397194e-23, -0.999908805, 4.4433474e-24, 1, -2.44819464e-23, 0.999908805, -4.11231652e-24, 0.0135048851)},
+    {name = "CHAKRA - REQ: 1.5M", position = CFrame.new(1354.25208, 383.52417, -2533.69312, 0.159802184, -1.0169769e-08, 0.98714906, -2.51422061e-09, 1, 1.07091696e-08, -0.98714906, -4.19325907e-09, 0.159802184)},
+    {name = "STR - REQ: 10M", position = CFrame.new(-685.502991, 231.566803, -1285.89978, -0.695391834, -7.42861062e-08, -0.718630791, -2.76938632e-08, 1, -7.65734214e-08, 0.718630791, -3.33468719e-08, -0.695391834)},
+    {name = "DURA - REQ: 10M", position = CFrame.new(-1482.38245, 241.138458, -1798.50427, -0.129959151, -1.69258474e-08, -0.991519332, -3.74117892e-09, 1, -1.65802589e-08, 0.991519332, 1.55469493e-09, -0.129959151)},
+    {name = "CHAKRA - REQ 15M", position = CFrame.new(-1537.15967, 241.409973, -2295.53296, 0.960862935, 2.37700526e-08, -0.277024239, -3.45747053e-09, 1, 7.38126644e-08, 0.277024239, -6.9966049e-08, 0.960862935)},
+    {name = "STR - REQ: 100M", position = CFrame.new(-2600.26245, 1304.8772, -2496.31226, -0.728572905, 5.97409411e-08, -0.684968293, 5.55453319e-08, 1, 2.81357817e-08, 0.684968293, -1.7547821e-08, -0.728572905)},
+    {name = "DURA - REQ: 100M", position = CFrame.new(-649.669861, 656.363342, -3650.89868, -0.225110367, 8.96333034e-08, 0.974333286, 1.71240622e-08, 1, -8.80381492e-08, -0.974333286, -3.13375637e-09, -0.225110367)},
+    {name = "CHAKRA - REQ: 250M", position = CFrame.new(3416.12305, 548.743042, -2180.60522, 0.84950906, -1.10149337e-07, -0.527574062, 1.18986982e-07, 1, -1.71896577e-08, 0.527574062, -4.81716746e-08, 0.84950906)},
+    {name = "STR - REQ: 1B", position = CFrame.new(2331.79688, 416.702728, -1885.24622, 0.492672622, -2.44205651e-08, 0.87021476, -6.27761221e-09, 1, 3.16167608e-08, -0.87021476, -2.10395825e-08, 0.492672622)},
+    {name = "DURA - REQ: 1B", position = CFrame.new(2912.64551, 944.36615, -1908.95178, 0.306751668, -7.61674102e-08, -0.951789558, 1.03535037e-07, 1, -4.66572274e-08, 0.951789558, -8.4231381e-08, 0.306751668)},
+    {name = "STR - REQ: 100B", position = CFrame.new(258.551727, 749.070251, -871.040405, -0.938940883, 2.46975631e-08, 0.344078481, 8.15878298e-09, 1, -4.95147141e-08, -0.344078481, -4.36841283e-08, -0.938940883)},
+    {name = "DURA - REQ: 100B", position = CFrame.new(-1644.28723, 407.979034, -3816.95435, 0.808300376, 5.32955227e-08, -0.58877033, -9.22367676e-08, 1, -3.61082932e-08, 0.58877033, 8.34926155e-08, 0.808300376)},
+    {name = "CHAKRA - REQ: 100B", position = CFrame.new(2396.40186, 258.694885, -1331.03406, 0.0559632517, -1.85064515e-08, 0.998432815, -6.32263664e-08, 1, 2.20794067e-08, -0.998432815, -6.4362915e-08, 0.0559632517)}
+    
+}
+
+-- Prepare dropdown choices based on teleport areas
+local teleportNames = {}
+for _, area in ipairs(teleportAreas) do
+    table.insert(teleportNames, area.name)
+end
+
+tab2.newDropdown("Teleport", "Select where you want to teleport!", teleportNames, function(selectedOption)
+    for _, area in ipairs(teleportAreas) do
+        if area.name == selectedOption then
+            selectedPosition = area.position
+            print("Teleport position set to", selectedOption)
+            break
+        end
+    end
+end)
+
+tab2.newButton("Teleport", "Teleport to the selected location!", function()
+    if selectedPosition then
+        local player = game.Players.LocalPlayer
+        if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = selectedPosition
+            print("Teleported to the selected position.")
+        else
+            print("Could not teleport. Player character not found.")
+        end
+    else
+        print("No teleport position selected.")
     end
 end)
