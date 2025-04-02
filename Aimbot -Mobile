@@ -1,0 +1,87 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = game:GetService("Workspace").CurrentCamera
+local RunService = game:GetService("RunService")
+
+local aimbotEnabled = false
+local radiusVisible = true  -- Set to false to hide the circle outline
+
+local aimRadius = 100  -- Detection radius
+local screenSize = Camera.ViewportSize / 2
+local closestPlayer = nil
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui", game.CoreGui)
+
+-- Toggle Button (Dark Mode Aesthetic)
+local button = Instance.new("TextButton")
+button.Parent = gui
+button.Size = UDim2.new(0, 60, 0, 25)
+button.Position = UDim2.new(0, 10, 0, 10)
+button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+button.Text = "OFF"
+button.TextColor3 = Color3.fromRGB(200, 200, 200)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 14
+button.BorderSizePixel = 0
+button.Draggable = true
+button.Active = true
+
+local uiCorner = Instance.new("UICorner", button)
+uiCorner.CornerRadius = UDim.new(0, 6)
+
+button.MouseButton1Click:Connect(function()
+    aimbotEnabled = not aimbotEnabled
+    button.Text = aimbotEnabled and "ON" or "OFF"
+    button.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(30, 30, 30)
+    button.TextColor3 = aimbotEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+end)
+
+-- Outlined Circular Detection Radius
+local circleOutline = Instance.new("Frame", gui)
+circleOutline.Size = UDim2.new(0, aimRadius * 2, 0, aimRadius * 2)
+circleOutline.Position = UDim2.new(0.5, -aimRadius, 0.5, -aimRadius)
+circleOutline.BackgroundTransparency = 1
+circleOutline.Visible = radiusVisible
+
+local border = Instance.new("UIStroke", circleOutline)
+border.Thickness = 2
+border.Color = Color3.fromRGB(0, 170, 255)
+
+local uiCorner = Instance.new("UICorner", circleOutline)
+uiCorner.CornerRadius = UDim.new(1, 0)
+
+-- Function to find closest player inside the radius
+local function getClosestPlayer()
+    local closestDist = aimRadius
+    local target = nil
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            if head then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenSize).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        target = head
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+-- Aimbot function (aims for head)
+RunService.RenderStepped:Connect(function()
+    if not aimbotEnabled then return end
+
+    closestPlayer = getClosestPlayer()
+
+    if closestPlayer then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPlayer.Position)
+    end
+end)
