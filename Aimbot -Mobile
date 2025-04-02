@@ -2,18 +2,19 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = game:GetService("Workspace").CurrentCamera
 local RunService = game:GetService("RunService")
+local Teams = game:GetService("Teams")
+local Workspace = game:GetService("Workspace")
 
 local aimbotEnabled = false
-local radiusVisible = false  -- Set to false to hide the circle outline
-
-local aimRadius = 100  -- Detection radius
+local isFFA = false  
+local aimRadius = 100  
 local screenSize = Camera.ViewportSize / 2
 local closestPlayer = nil
 
 -- GUI Setup
 local gui = Instance.new("ScreenGui", game.CoreGui)
 
--- Toggle Button (Dark Mode Aesthetic)
+-- Aimbot Toggle Button (Dark Mode Aesthetic)
 local button = Instance.new("TextButton")
 button.Parent = gui
 button.Size = UDim2.new(0, 60, 0, 25)
@@ -30,6 +31,24 @@ button.Active = true
 local uiCorner = Instance.new("UICorner", button)
 uiCorner.CornerRadius = UDim.new(0, 6)
 
+-- FFA Toggle Button
+local ffaButton = Instance.new("TextButton")
+ffaButton.Parent = gui
+ffaButton.Size = UDim2.new(0, 60, 0, 25)
+ffaButton.Position = UDim2.new(0, 10, 0, 45)
+ffaButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ffaButton.Text = "TEAM"
+ffaButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+ffaButton.Font = Enum.Font.GothamBold
+ffaButton.TextSize = 14
+ffaButton.BorderSizePixel = 0
+ffaButton.Draggable = true
+ffaButton.Active = true
+
+local ffaCorner = Instance.new("UICorner", ffaButton)
+ffaCorner.CornerRadius = UDim.new(0, 6)
+
+-- Aimbot Toggle Function
 button.MouseButton1Click:Connect(function()
     aimbotEnabled = not aimbotEnabled
     button.Text = aimbotEnabled and "ON" or "OFF"
@@ -37,36 +56,110 @@ button.MouseButton1Click:Connect(function()
     button.TextColor3 = aimbotEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
 end)
 
--- Outlined Circular Detection Radius
-local circleOutline = Instance.new("Frame", gui)
-circleOutline.Size = UDim2.new(0, aimRadius * 2, 0, aimRadius * 2)
-circleOutline.Position = UDim2.new(0.5, -aimRadius, 0.5, -aimRadius)
-circleOutline.BackgroundTransparency = 1
-circleOutline.Visible = radiusVisible
+-- FFA Toggle Function
+ffaButton.MouseButton1Click:Connect(function()
+    isFFA = not isFFA
+    ffaButton.Text = isFFA and "FFA" or "TEAM"
+    ffaButton.BackgroundColor3 = isFFA and Color3.fromRGB(255, 128, 0) or Color3.fromRGB(30, 30, 30)
+    ffaButton.TextColor3 = isFFA and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+end)
 
-local border = Instance.new("UIStroke", circleOutline)
-border.Thickness = 2
-border.Color = Color3.fromRGB(0, 170, 255)
+-- Function to check if an enemy is visible (not behind walls)
+local function isVisible(targetPart)
+    if not targetPart then return false end
 
-local uiCorner = Instance.new("UICorner", circleOutline)
-uiCorner.CornerRadius = UDim.new(1, 0)
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character}  -- Ignore local player
+    params.FilterType = Enum.RaycastFilterType.Blacklist  
 
--- Function to find closest player inside the radius
+    local result = Workspace:Raycast(origin, direction, params)
+
+    -- If the ray hits nothing OR hits the enemy itself, it's visible
+    return result == nil or (result.Instance and result.Instance:IsDescendantOf(targetPart.Parent))
+end
+
+-- Function to check if a player is alive (not dead, downed, or ragdolled)
+local function isPlayerAlive(character)
+    if not character then return false end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return false end
+    
+    local ragdollValue = character:FindFirstChild("Ragdolled")
+    if ragdollValue and ragdollValue.Value == true then return false end
+    
+    local knocked = character:FindFirstChild("Knocked") or character:FindFirstChild("Downed") or character:FindFirstChild("IsDown")
+    if knocked and knocked.Value == true then return false end
+    
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+            local name = track.Animation.Name:lower()
+            if name:match("down") or name:match("dead") or name:match("ragdoll") or name:match("knocked") then
+                return false
+            end
+        end
+    end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if rootPart and rootPart:FindFirstChild("Anchored") and rootPart.Anchored then
+        return false
+    end
+    
+    return true
+end
+
+-- Function to check if a player is an enemy
+local function isEnemy(player)
+    if isFFA then
+        return true
+    else
+        if player.Team and LocalPlayer.Team then
+            return player.Team ~= LocalPlayer.Team
+        end
+        
+        if player.TeamColor and LocalPlayer.TeamColor then
+            return player.TeamColor ~= LocalPlayer.TeamColor
+        end
+        
+        if player.Character and LocalPlayer.Character then
+            local playerTeam = player.Character:FindFirstChild("Team")
+            local localTeam = LocalPlayer.Character:FindFirstChild("Team")
+            
+            if playerTeam and localTeam then
+                if typeof(playerTeam) == "Instance" and typeof(localTeam) == "Instance" then
+                    return playerTeam.Value ~= localTeam.Value
+                elseif typeof(playerTeam) == "string" and typeof(localTeam) == "string" then
+                    return playerTeam ~= localTeam
+                elseif typeof(playerTeam) == "number" and typeof(localTeam) == "number" then
+                    return playerTeam ~= localTeam
+                end
+            end
+        end
+        
+        return false
+    end
+end
+
+-- Function to find the closest enemy within the radius
 local function getClosestPlayer()
     local closestDist = aimRadius
     local target = nil
 
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            local head = player.Character:FindFirstChild("Head")
-            if head then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-
-                if onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenSize).Magnitude
-                    if dist < closestDist then
-                        closestDist = dist
-                        target = head
+            if isPlayerAlive(player.Character) and isEnemy(player) then
+                local head = player.Character:FindFirstChild("Head")
+                if head and isVisible(head) then  -- Visibility check
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenSize).Magnitude
+                        if dist < closestDist then
+                            closestDist = dist
+                            target = head
+                        end
                     end
                 end
             end
