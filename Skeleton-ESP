@@ -1,0 +1,158 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local ESP_COLOR = Color3.fromRGB(255, 0, 0)
+local skeletonESP = {}
+
+-- Function to create a drawing line
+local function createESPLine()
+    local line = Drawing.new("Line")
+    line.Thickness = 1.5
+    line.Color = ESP_COLOR
+    line.Transparency = 1
+    return line
+end
+
+-- Function to remove ESP when a player leaves
+local function removeESP(player)
+    if skeletonESP[player] then
+        for _, line in pairs(skeletonESP[player]) do
+            line:Remove()
+        end
+        skeletonESP[player] = nil
+    end
+end
+
+-- Function to create ESP for a player
+local function createSkeletonESP(player)
+    if player == LocalPlayer or skeletonESP[player] then return end
+
+    skeletonESP[player] = {}
+
+    local jointsR15 = {
+        {"Head", "UpperTorso"},
+        {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"},
+        {"UpperTorso", "RightUpperArm"},
+        {"LeftUpperArm", "LeftLowerArm"},
+        {"RightUpperArm", "RightLowerArm"},
+        {"LeftLowerArm", "LeftHand"},
+        {"RightLowerArm", "RightHand"},
+        {"LowerTorso", "LeftUpperLeg"},
+        {"LowerTorso", "RightUpperLeg"},
+        {"LeftUpperLeg", "LeftLowerLeg"},
+        {"RightUpperLeg", "RightLowerLeg"},
+        {"LeftLowerLeg", "LeftFoot"},
+        {"RightLowerLeg", "RightFoot"},
+    }
+
+    local jointsR6 = {
+        {"Head", "Torso"},
+        {"Torso", "Left Arm"},
+        {"Torso", "Right Arm"},
+        {"Torso", "Left Leg"},
+        {"Torso", "Right Leg"},
+        {"Left Arm", "Left Leg"},
+        {"Right Arm", "Right Leg"},
+    }
+
+    local joints = jointsR15
+    if player.Character and player.Character:FindFirstChild("Torso") then
+        joints = jointsR6 -- Use R6 joints if "Torso" is found
+    end
+
+    for _ in pairs(joints) do
+        table.insert(skeletonESP[player], createESPLine())
+    end
+end
+
+-- Function to update ESP
+local function updateSkeletonESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        local char = player.Character
+        if player ~= LocalPlayer and char and char:FindFirstChild("HumanoidRootPart") then
+            createSkeletonESP(player)
+
+            local jointsR15 = {
+                {"Head", "UpperTorso"},
+                {"UpperTorso", "LowerTorso"},
+                {"UpperTorso", "LeftUpperArm"},
+                {"UpperTorso", "RightUpperArm"},
+                {"LeftUpperArm", "LeftLowerArm"},
+                {"RightUpperArm", "RightLowerArm"},
+                {"LeftLowerArm", "LeftHand"},
+                {"RightLowerArm", "RightHand"},
+                {"LowerTorso", "LeftUpperLeg"},
+                {"LowerTorso", "RightUpperLeg"},
+                {"LeftUpperLeg", "LeftLowerLeg"},
+                {"RightUpperLeg", "RightLowerLeg"},
+                {"LeftLowerLeg", "LeftFoot"},
+                {"RightLowerLeg", "RightFoot"},
+            }
+
+            local jointsR6 = {
+                {"Head", "Torso"},
+                {"Torso", "Left Arm"},
+                {"Torso", "Right Arm"},
+                {"Torso", "Left Leg"},
+                {"Torso", "Right Leg"},
+                {"Left Arm", "Left Leg"},
+                {"Right Arm", "Right Leg"},
+            }
+
+            local joints = jointsR15
+            if char:FindFirstChild("Torso") then
+                joints = jointsR6 -- Switch to R6 joints if "Torso" exists
+            end
+
+            for i, joint in ipairs(joints) do
+                local part1 = char:FindFirstChild(joint[1])
+                local part2 = char:FindFirstChild(joint[2])
+                local line = skeletonESP[player] and skeletonESP[player][i]
+
+                if part1 and part2 and line then
+                    local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
+                    local pos2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
+
+                    if onScreen1 and onScreen2 then
+                        line.From = Vector2.new(pos1.X, pos1.Y)
+                        line.To = Vector2.new(pos2.X, pos2.Y)
+                        line.Visible = true
+                    else
+                        line.Visible = false
+                    end
+                elseif line then
+                    line.Visible = false
+                end
+            end
+        else
+            removeESP(player)
+        end
+    end
+end
+
+-- Ensure ESP updates for new players
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(0.2) -- Ensures all body parts exist before creating ESP
+        createSkeletonESP(player)
+    end)
+end)
+
+-- Ensure ESP updates for existing players
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        task.spawn(function()
+            task.wait(0.2) -- Ensures body parts load
+            createSkeletonESP(player)
+        end)
+    end
+end
+
+-- Remove ESP when a player leaves
+Players.PlayerRemoving:Connect(removeESP)
+
+-- Run ESP update loop
+RunService.RenderStepped:Connect(updateSkeletonESP)
