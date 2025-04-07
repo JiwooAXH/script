@@ -1,0 +1,265 @@
+-- Lua Obfuscator GUI with Enhanced Features (Mobile-Centered Fix)
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+-- ScreenGui
+local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+ScreenGui.Name = "ObfuscatorGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true -- FIX: ensure center on mobile
+
+-- Main Frame (Centered)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 500, 0, 400)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0) -- true center
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+MainFrame.ClipsDescendants = true
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Name = "MainObfuscator"
+
+local corner = Instance.new("UICorner", MainFrame)
+corner.CornerRadius = UDim.new(0, 12)
+
+-- Fonts & Colors
+local font = Enum.Font.Gotham
+local labelColor = Color3.fromRGB(240, 240, 240)
+local boxColor = Color3.fromRGB(30, 30, 30)
+local buttonColor = Color3.fromRGB(50, 50, 50)
+local highlightColor = Color3.fromRGB(90, 170, 255)
+
+-- Labels, Input, Output Boxes
+local topLabel = Instance.new("TextLabel", MainFrame)
+topLabel.Text = "Put your Script here"
+topLabel.Size = UDim2.new(1, 0, 0, 30)
+topLabel.BackgroundTransparency = 1
+topLabel.Font = font
+topLabel.TextColor3 = labelColor
+topLabel.TextSize = 16
+topLabel.Position = UDim2.new(0, 0, 0, 5)
+
+local inputBox = Instance.new("TextBox", MainFrame)
+inputBox.Size = UDim2.new(1, -40, 0, 120)
+inputBox.Position = UDim2.new(0, 20, 0, 35)
+inputBox.BackgroundColor3 = boxColor
+inputBox.ClearTextOnFocus = false
+inputBox.MultiLine = true
+inputBox.Font = font
+inputBox.TextSize = 15
+inputBox.TextColor3 = labelColor
+inputBox.TextWrapped = true
+inputBox.Text = ""
+inputBox.PlaceholderText = "-- Paste your Lua script here\n\nMade by: Yuki"
+inputBox.TextEditable = true
+inputBox.Active = true
+inputBox.Selectable = true
+Instance.new("UICorner", inputBox).CornerRadius = UDim.new(0, 8)
+
+local confirmButton = Instance.new("TextButton", MainFrame)
+confirmButton.Size = UDim2.new(0, 180, 0, 30)
+confirmButton.Position = UDim2.new(0.5, -100, 0, 165)
+confirmButton.BackgroundColor3 = buttonColor
+confirmButton.Text = "Confirm & Obfuscate"
+confirmButton.Font = font
+confirmButton.TextColor3 = highlightColor
+confirmButton.TextSize = 15
+Instance.new("UICorner", confirmButton).CornerRadius = UDim.new(0, 8)
+
+local resultLabel = Instance.new("TextLabel", MainFrame)
+resultLabel.Text = "Obfuscated"
+resultLabel.Size = UDim2.new(1, 0, 0, 30)
+resultLabel.Position = UDim2.new(0, 0, 0, 205)
+resultLabel.BackgroundTransparency = 1
+resultLabel.Font = font
+resultLabel.TextColor3 = labelColor
+resultLabel.TextSize = 16
+
+local outputBox = Instance.new("TextBox", MainFrame)
+outputBox.Size = UDim2.new(1, -40, 0, 120)
+outputBox.Position = UDim2.new(0, 20, 0, 235)
+outputBox.BackgroundColor3 = boxColor
+outputBox.ClearTextOnFocus = false
+outputBox.MultiLine = true
+outputBox.Font = font
+outputBox.TextSize = 15
+outputBox.TextColor3 = labelColor
+outputBox.TextWrapped = true
+outputBox.Text = ""
+outputBox.PlaceholderText = "-- Obfuscated script will appear here"
+outputBox.TextEditable = false
+outputBox.Active = true
+outputBox.Selectable = true
+Instance.new("UICorner", outputBox).CornerRadius = UDim.new(0, 8)
+
+-- Additional buttons outside the text box (Clear All and Copy to Clipboard)
+local bottomButtonFrame = Instance.new("Frame", MainFrame)
+bottomButtonFrame.Size = UDim2.new(1, 0, 0, 50)
+bottomButtonFrame.Position = UDim2.new(0, 0, 1, -50)
+bottomButtonFrame.BackgroundTransparency = 1
+bottomButtonFrame.Name = "BottomButtonFrame"
+
+local clearButton = Instance.new("TextButton", bottomButtonFrame)
+clearButton.Size = UDim2.new(0, 100, 0, 30)
+clearButton.Position = UDim2.new(0, 20, 0, 10)
+clearButton.BackgroundColor3 = buttonColor
+clearButton.Text = "Clear All"
+clearButton.Font = font
+clearButton.TextColor3 = highlightColor
+clearButton.TextSize = 15
+Instance.new("UICorner", clearButton).CornerRadius = UDim.new(0, 8)
+
+local copyButton = Instance.new("TextButton", bottomButtonFrame)
+copyButton.Size = UDim2.new(0, 170, 0, 30)
+copyButton.Position = UDim2.new(0, 130, 0, 10)
+copyButton.BackgroundColor3 = buttonColor
+copyButton.Text = "Copy to Clipboard"
+copyButton.Font = font
+copyButton.TextColor3 = highlightColor
+copyButton.TextSize = 15
+Instance.new("UICorner", copyButton).CornerRadius = UDim.new(0, 8)
+
+-- Obfuscation logic without comments
+local function obfuscateScript(scriptText)
+	local result = {}
+	for i = 1, #scriptText do
+		table.insert(result, string.byte(scriptText:sub(i, i)))
+	end
+
+	return [[
+local chars = { ]] .. table.concat(result, ", ") .. [[ }
+local function fromChars(tbl)
+ local s = {}
+ for i = 1, #tbl do
+  s[i] = string.char(tbl[i])
+ end
+ return table.concat(s)
+end
+
+local encoded = string.reverse(fromChars(chars))
+local finalURL = string.reverse(encoded)
+
+loadstring(finalURL)()
+]]
+end
+
+confirmButton.MouseButton1Click:Connect(function()
+	if inputBox.Text ~= "" then
+		outputBox.Text = obfuscateScript(inputBox.Text)
+	else
+		outputBox.Text = "-- Please paste a script above first."
+	end
+end)
+
+-- Clear All Button functionality
+clearButton.MouseButton1Click:Connect(function()
+	inputBox.Text = ""
+	outputBox.Text = ""
+end)
+
+-- Copy to Clipboard Button functionality
+copyButton.MouseButton1Click:Connect(function()
+	setclipboard(outputBox.Text)
+end)
+
+-- Save and Load Functionality (Using DataStore for simplicity)
+local DataStoreService = game:GetService("DataStoreService")
+local scriptDataStore = DataStoreService:GetDataStore("LuaObfuscatorDataStore")
+
+local function saveScript()
+	local success, err = pcall(function()
+		scriptDataStore:SetAsync(player.UserId, inputBox.Text)
+	end)
+	if success then
+		print("Script saved successfully.")
+	else
+		print("Failed to save script: " .. err)
+	end
+end
+
+local function loadScript()
+	local success, data = pcall(function()
+		return scriptDataStore:GetAsync(player.UserId)
+	end)
+	if success and data then
+		inputBox.Text = data
+		print("Script loaded successfully.")
+	else
+		print("No saved script found.")
+	end
+end
+
+-- Draggable GUI logic with smooth transitions
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+		startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+MainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+-- Fade-in animation for the MainFrame
+local fadeInTween = TweenService:Create(MainFrame, TweenInfo.new(0.5), {Transparency = 0})
+MainFrame.BackgroundTransparency = 1
+fadeInTween:Play()
+
+-- Toggle Button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 30, 0, 30)
+toggleButton.Position = UDim2.new(1, -40, 0.5, -15)
+toggleButton.AnchorPoint = Vector2.new(0, 0.5)
+toggleButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+toggleButton.Text = "≡"
+toggleButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+toggleButton.Font = font
+toggleButton.TextSize = 20
+toggleButton.Parent = ScreenGui
+toggleButton.ZIndex = 10
+Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(1, 0)
+
+local guiVisible = true
+toggleButton.MouseButton1Click:Connect(function()
+	guiVisible = not guiVisible
+	MainFrame.Visible = guiVisible
+end)
+
+-- Smooth fade out on hide (if desired)
+toggleButton.MouseButton1Click:Connect(function()
+	local fadeOutTween = TweenService:Create(MainFrame, TweenInfo.new(0.5), {Transparency = 1})
+	fadeOutTween:Play()
+	wait(0.5) -- Wait for the fade out to finish
+	MainFrame.Visible = guiVisible
+end)
+
+-- Add this to load the script at the start
+loadScript()
