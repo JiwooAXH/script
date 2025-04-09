@@ -1,0 +1,50 @@
+local scaleFactor = 5
+local originalSizes = {}
+
+local function resizeModel(model)
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if not originalSizes[part] then
+                originalSizes[part] = part.Size
+            end
+
+            local newSize = originalSizes[part] * scaleFactor
+
+            -- Create an invisible hitbox
+            local hitbox = Instance.new("Part")
+            hitbox.Size = newSize
+            hitbox.Position = part.Position
+            hitbox.Anchored = part.Anchored
+            hitbox.CanCollide = part.CanCollide
+            hitbox.Transparency = 1 -- Invisible hitbox
+            hitbox.Parent = model
+
+            -- Keep the original ball visible
+            part.Size = originalSizes[part]
+        end
+    end
+end
+
+local function findAndResizeBall()
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and obj.Name:match("^CLIENT_BALL_%d+$") then
+            resizeModel(obj)
+        end
+    end
+end
+
+findAndResizeBall()
+
+local connection = workspace.ChildAdded:Connect(function(child)
+    if child:IsA("Model") and child.Name:match("^CLIENT_BALL_%d+$") then
+        resizeModel(child)
+    end
+end)
+
+_G.CLIENT_BALL_SCRIPT = connection
+
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Volleyball Legends";
+    Text = "Script is Executed";
+    Duration = 3;
+})
