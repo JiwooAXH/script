@@ -1,4 +1,4 @@
-local scaleFactor = 5
+local scaleFactor = 3
 local originalSizes = {}
 
 local function resizeModel(model)
