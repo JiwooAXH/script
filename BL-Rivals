@@ -1,0 +1,203 @@
+-- Load Fluent UI and Addons
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- Create Fluent Window
+local Window = Fluent:CreateWindow({
+    Title = "BL: Rivals",
+    SubTitle = "Made by: Yuki",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(520, 340),
+    Acrylic = true,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Ball", Icon = "edit" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+-- === Hitbox Controller ===
+local hitboxSize, showHitbox, hitboxOpacity = 20, false, 0.2
+local hitboxController
+
+local function initializeHitbox()
+    local football = workspace:WaitForChild("Football")
+    local hitbox = football:FindFirstChild("Hitbox")
+
+    if not hitbox then
+        hitbox = Instance.new("Part")
+        hitbox.Name = "Hitbox"
+        hitbox.Anchored = true
+        hitbox.CanCollide = false
+        hitbox.Transparency = 1
+        hitbox.Parent = football
+    end
+
+    local function updateHitbox()
+        hitbox.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+        hitbox.Position = football.Position
+
+        if showHitbox then
+            hitbox.Transparency = 1 - hitboxOpacity
+            hitbox.BrickColor = BrickColor.new("Really red")
+            hitbox.Material = Enum.Material.SmoothPlastic
+        else
+            hitbox.Transparency = 1
+        end
+    end
+
+    function toggleHitboxVisibility(visible)
+        showHitbox = visible
+        updateHitbox()
+    end
+
+    function setHitboxSize(size)
+        hitboxSize = size
+        updateHitbox()
+    end
+
+    function setHitboxOpacity(opacity)
+        hitboxOpacity = opacity
+        updateHitbox()
+    end
+
+    game:GetService("RunService").Heartbeat:Connect(function()
+        hitbox.Position = football.Position
+    end)
+
+    updateHitbox()
+
+    return {
+        toggleVisibility = toggleHitboxVisibility,
+        setSize = setHitboxSize,
+        setOpacity = setHitboxOpacity
+    }
+end
+
+hitboxController = initializeHitbox()
+
+-- === Stamina Controller ===
+local staminaLoop, staminaConnection
+
+local function initializeStaminaController()
+    local function enableStaminaHack()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+
+        local function waitForPath(instance, path)
+            for _, childName in ipairs(path) do
+                instance = instance:WaitForChild(childName)
+            end
+            return instance
+        end
+
+        local stamina = waitForPath(LocalPlayer, { "PlayerStats", "Stamina" })
+        stamina.Value = 100
+
+        local connection = stamina:GetPropertyChangedSignal("Value"):Connect(function()
+            if stamina.Value ~= 100 then
+                stamina.Value = 100
+            end
+        end)
+
+        staminaLoop = task.spawn(function()
+            while true do
+                task.wait(1)
+                if stamina.Value ~= 100 then
+                    stamina.Value = 100
+                end
+            end
+        end)
+
+        return connection
+    end
+
+    local function disableStaminaHack(connection)
+        if connection then connection:Disconnect() end
+        if staminaLoop then task.cancel(staminaLoop) staminaLoop = nil end
+    end
+
+    return {
+        enable = enableStaminaHack,
+        disable = disableStaminaHack
+    }
+end
+
+local staminaController = initializeStaminaController()
+
+-- === Ball Tab UI ===
+Tabs.Main:AddParagraph({
+    Title = "Ball",
+    Content = "Hitbox Expander."
+})
+
+Tabs.Main:AddToggle("HitboxVisible", {
+    Title = "Visible Hitbox",
+    Default = false
+}):OnChanged(function(state)
+    hitboxController.toggleVisibility(state)
+end)
+
+Tabs.Main:AddInput("HitboxSizeInput", {
+    Title = "Hitbox Size",
+    Placeholder = "Enter size (e.g., 20)"
+}):OnChanged(function(text)
+    local size = tonumber(text)
+    if size and size > 0 then
+        hitboxController.setSize(size)
+    end
+end)
+
+Tabs.Main:AddInput("HitboxOpacityInput", {
+    Title = "Hitbox Opacity (0.1 - 1)",
+    Placeholder = "Enter opacity (e.g., 0.2)"
+}):OnChanged(function(text)
+    local opacity = tonumber(text)
+    if opacity and opacity >= 0.1 and opacity <= 1 then
+        hitboxController.setOpacity(opacity)
+    end
+end)
+
+-- === Player Tab UI ===
+Tabs.Player:AddParagraph({
+    Title = "Stamina",
+    Content = "Enable infinite stamina\nto keep your energy full at all times."
+})
+
+Tabs.Player:AddToggle("InfiniteStamina", {
+    Title = "Infinite Stamina",
+    Default = false
+}):OnChanged(function(state)
+    if state then
+        staminaConnection = staminaController.enable()
+    else
+        staminaController.disable(staminaConnection)
+    end
+end)
+
+
+-- === Settings / Save ===
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/BLRivals")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "BL: Rivals",
+    Content = "Script successfully loaded!",
+    Duration = 3
+})
+
+SaveManager:LoadAutoloadConfig()
