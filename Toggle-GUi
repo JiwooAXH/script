@@ -1,0 +1,174 @@
+local ToggleGui = Instance.new("ScreenGui")
+local Toggle = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+local Shadow = Instance.new("ImageLabel")
+local UIGradient = Instance.new("UIGradient")
+local StatusText = Instance.new("TextLabel")
+
+local IsOpen = true
+
+-- Properties
+ToggleGui.Name = "ModernToggleGui"
+ToggleGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+ToggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ToggleGui.ResetOnSpawn = false
+
+-- Check if user is on mobile or PC
+local UserInputService = game:GetService("UserInputService")
+local isMobile = UserInputService.TouchEnabled and not (UserInputService.KeyboardEnabled or UserInputService.MouseEnabled)
+
+-- Only show the GUI on mobile devices
+if not isMobile then
+    ToggleGui.Enabled = false
+end
+
+-- Shadow effect for depth
+Shadow.Name = "Shadow"
+Shadow.Parent = Toggle
+Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+Shadow.BackgroundTransparency = 1
+Shadow.Position = UDim2.new(0.5, 0, 0.5, 3)
+Shadow.Size = UDim2.new(1, 6, 1, 6)
+Shadow.ZIndex = 0
+Shadow.Image = "rbxassetid://1316045217"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.7
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+
+-- Button styling - made smaller
+Toggle.Name = "Toggle"
+Toggle.Parent = ToggleGui
+Toggle.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Toggle.Position = UDim2.new(0, 10, 0.5, 0) -- Positioned in the middle left
+Toggle.Size = UDim2.new(0, 70, 0, 30) -- Made smaller
+Toggle.Font = Enum.Font.GothamSemibold
+Toggle.Text = ""
+Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+Toggle.TextSize = 12.000 -- Smaller text
+Toggle.AutoButtonColor = false
+Toggle.Draggable = true
+
+-- Modern rounded corners
+UICorner.Parent = Toggle
+UICorner.CornerRadius = UDim.new(0, 6) -- Smaller corners
+
+-- Status text
+StatusText.Name = "StatusText"
+StatusText.Parent = Toggle
+StatusText.BackgroundTransparency = 1
+StatusText.Position = UDim2.new(0, 0, 0, 0)
+StatusText.Size = UDim2.new(1, 0, 1, 0)
+StatusText.Font = Enum.Font.GothamSemibold
+StatusText.Text = "Close"
+StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusText.TextSize = 12.000
+
+-- Gradient for modern look
+UIGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 60)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 35))
+}
+UIGradient.Rotation = 45
+UIGradient.Parent = Toggle
+
+-- Button hover and click effects
+local function updateButtonVisual(isHovered, isPressed)
+    local baseColor = Color3.fromRGB(25, 25, 30)
+    local hoverColor = Color3.fromRGB(35, 35, 45)
+    local pressColor = Color3.fromRGB(20, 20, 25)
+    
+    if isPressed then
+        Toggle.BackgroundColor3 = pressColor
+        UIGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 45)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 30))
+        }
+    elseif isHovered then
+        Toggle.BackgroundColor3 = hoverColor
+        UIGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 70)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 50))
+        }
+    else
+        Toggle.BackgroundColor3 = baseColor
+        UIGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 60)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 35))
+        }
+    end
+end
+
+-- Set up hover effects for PC users (even though GUI is hidden)
+Toggle.MouseEnter:Connect(function()
+    if not isMobile then
+        updateButtonVisual(true, false)
+    end
+end)
+
+Toggle.MouseLeave:Connect(function()
+    if not isMobile then
+        updateButtonVisual(false, false)
+    end
+end)
+
+-- Function to hide the cursor on mobile when clicking the button
+local function hideCursor()
+    if isMobile then
+        UserInputService.ModalEnabled = true
+        wait(0.1) -- Wait a bit for the click to register
+        UserInputService.ModalEnabled = false
+    end
+end
+
+-- Click functionality
+Toggle.MouseButton1Click:Connect(function()
+    -- Hide cursor if on mobile
+    hideCursor()
+    
+    -- Send key press
+    getgenv().keytoclick = "LeftControl"
+    local vim = game:service("VirtualInputManager")
+    vim:SendKeyEvent(true, keytoclick, false, game)
+    
+    -- Toggle state
+    IsOpen = not IsOpen
+    if IsOpen then
+        StatusText.Text = "Close"
+    else
+        StatusText.Text = "Open"
+    end
+    
+    -- Click animation
+    local originalSize = Toggle.Size
+    local originalPosition = Toggle.Position
+    
+    Toggle:TweenSize(UDim2.new(0, 68, 0, 28), "Out", "Quad", 0.1, true)
+    wait(0.1)
+    Toggle:TweenSize(originalSize, "Out", "Quad", 0.1, true)
+end)
+
+-- Subtle pulsing animation (reduced effect for smaller button)
+spawn(function()
+    while wait(1) do
+        Shadow:TweenSize(UDim2.new(1, 8, 1, 8), "InOut", "Sine", 1.5, true)
+        wait(1.5)
+        Shadow:TweenSize(UDim2.new(1, 6, 1, 6), "InOut", "Sine", 1.5, true)
+    end
+end)
+
+-- Subtle accent color animation
+spawn(function()
+    local hue = 0
+    while wait(0.05) do
+        hue = (hue + 0.003) % 1
+        local accentColor = Color3.fromHSV(hue, 0.7, 0.9)
+        
+        -- Create a subtle border glow effect
+        Shadow.ImageColor3 = Color3.fromRGB(
+            math.min(accentColor.R * 255 * 0.5, 255),
+            math.min(accentColor.G * 255 * 0.5, 255),
+            math.min(accentColor.B * 255 * 0.5, 255)
+        )
+    end
+end)
