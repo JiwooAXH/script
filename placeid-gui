@@ -1,0 +1,75 @@
+-- PlaceID GUI with Copy Functionality
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local player = Players.LocalPlayer
+
+-- Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "PlaceIdGUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Make GUI draggable frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 140)
+frame.Position = UDim2.new(0.5, -150, 0.5, -50)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+-- UI Corner for rounded edges
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 10)
+
+-- TextLabel for title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Current Place ID"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.Gotham
+title.TextSize = 16
+title.Parent = frame
+
+-- TextBox to show PlaceId
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(0.9, 0, 0, 30)
+box.Position = UDim2.new(0.05, 0, 0.4, 0)
+box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+box.Text = tostring(game.PlaceId)
+box.TextColor3 = Color3.fromRGB(255, 255, 255)
+box.ClearTextOnFocus = false
+box.Font = Enum.Font.Gotham
+box.TextSize = 16
+box.TextEditable = false
+box.Parent = frame
+
+local boxCorner = Instance.new("UICorner", box)
+boxCorner.CornerRadius = UDim.new(0, 6)
+
+-- Copy Button
+local copyButton = Instance.new("TextButton")
+copyButton.Size = UDim2.new(0.9, 0, 0, 30)
+copyButton.Position = UDim2.new(0.05, 0, 0.65, 0)
+copyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+copyButton.Text = "Copy to Clipboard"
+copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyButton.Font = Enum.Font.GothamBold
+copyButton.TextSize = 14
+copyButton.Parent = frame
+
+local buttonCorner = Instance.new("UICorner", copyButton)
+buttonCorner.CornerRadius = UDim.new(0, 6)
+
+-- Copy functionality
+copyButton.MouseButton1Click:Connect(function()
+    setclipboard(tostring(game.PlaceId))
+    StarterGui:SetCore("SendNotification", {
+        Title = "Copied!";
+        Text = "Place ID copied to clipboard.";
+        Duration = 3;
+    })
+end)
