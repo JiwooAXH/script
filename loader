@@ -15,6 +15,10 @@ local allowedGames = {
     ["Player ESP"] = {
         url = "https://raw.githubusercontent.com/JiwooAXH/script/main/2D-Box-ESP",
         ids = {}
+    },
+    ["Blair"] = {
+        url = "https://pastes.io/raw/iiblair-31"
+        ids = {}
     }
 }
 
