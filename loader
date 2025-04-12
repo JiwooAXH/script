@@ -17,7 +17,7 @@ local allowedGames = {
         ids = {}
     },
     ["Blair"] = {
-        url = "https://pastes.io/raw/iiblair-31"
+        url = "https://pastes.io/raw/iiblair-31",
         ids = {}
     }
 }
