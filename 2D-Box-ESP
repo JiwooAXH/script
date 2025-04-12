@@ -1,0 +1,118 @@
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local function CreateESP(Player)
+    if Player == LocalPlayer then return end -- Exclude local player
+    
+    -- Create four separate lines for the box outline
+    local TopLine = Drawing.new("Line")
+    local BottomLine = Drawing.new("Line")
+    local LeftLine = Drawing.new("Line")
+    local RightLine = Drawing.new("Line")
+
+    local HPBar = Drawing.new("Line") -- Thinner HP bar
+    
+    -- Name & Distance Text
+    local NameText = Drawing.new("Text")
+    local DistanceText = Drawing.new("Text")
+
+    -- Dark mode colors
+    local BoxColor = Color3.fromRGB(200, 200, 200) -- Light gray outline
+    local HPFullColor = Color3.fromRGB(0, 180, 0) -- Dark green for full HP
+    local HPEmptyColor = Color3.fromRGB(180, 0, 0) -- Dark red for low HP
+    
+    -- Configure properties for all lines
+    for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine, HPBar}) do
+        Line.Color = BoxColor
+        Line.Thickness = 1.5 -- Thinner outline for a modern look
+    end
+
+    HPBar.Thickness = 1 -- Very thin HP bar
+
+    -- Configure text properties
+    for _, Txt in pairs({NameText, DistanceText}) do
+        Txt.Size = 12 -- Small, modern text
+        Txt.Center = true
+        Txt.Outline = true
+        Txt.Color = Color3.fromRGB(255, 255, 255) -- White text
+        Txt.Font = Drawing.Fonts.Plex -- Modern, sleek font
+    end
+
+    NameText.Text = Player.DisplayName -- Set player display name
+
+    local function UpdateESP()
+        if not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") or not Player.Character:FindFirstChild("Humanoid") then
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine, HPBar}) do
+                Line.Visible = false
+            end
+            for _, Txt in pairs({NameText, DistanceText}) do
+                Txt.Visible = false
+            end
+            return
+        end
+        
+        local RootPart = Player.Character.HumanoidRootPart
+        local Humanoid = Player.Character.Humanoid
+        local Vector, OnScreen = Camera:WorldToViewportPoint(RootPart.Position)
+
+        if OnScreen then
+            local Distance = (LocalPlayer.Character.HumanoidRootPart.Position - RootPart.Position).Magnitude
+            local FadeFactor = math.clamp(Distance / 100, 0, 1) -- Fades out when closer than 100 studs
+            
+            local SizeY = math.clamp(3000 / Vector.Z, 30, 120) -- Smaller box size
+            local SizeX = SizeY * 0.5
+            local Position = Vector2.new(Vector.X - SizeX / 2, Vector.Y - SizeY / 2)
+            
+            -- Define box outline
+            TopLine.From = Position
+            TopLine.To = Position + Vector2.new(SizeX, 0)
+            
+            BottomLine.From = Position + Vector2.new(0, SizeY)
+            BottomLine.To = BottomLine.From + Vector2.new(SizeX, 0)
+            
+            LeftLine.From = Position
+            LeftLine.To = Position + Vector2.new(0, SizeY)
+            
+            RightLine.From = Position + Vector2.new(SizeX, 0)
+            RightLine.To = RightLine.From + Vector2.new(0, SizeY)
+
+            -- HP Bar
+            local HPPercent = Humanoid.Health / Humanoid.MaxHealth
+            local HPHeight = SizeY * HPPercent
+            local HPStart = Position + Vector2.new(-4, SizeY - HPHeight)
+            local HPEnd = Position + Vector2.new(-4, SizeY)
+
+            HPBar.From = HPStart
+            HPBar.To = HPEnd
+            HPBar.Color = HPFullColor:Lerp(HPEmptyColor, 1 - HPPercent)
+
+            -- Player Name & Distance
+            NameText.Position = Vector2.new(Vector.X, Position.Y - 14)
+            DistanceText.Position = Vector2.new(Vector.X, Position.Y + SizeY + 2)
+
+            DistanceText.Text = string.format("Dist: %dm", math.floor(Distance))
+
+            -- Apply fading effect
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine, HPBar, NameText, DistanceText}) do
+                Line.Transparency = FadeFactor
+                Line.Visible = FadeFactor > 0 -- Hide completely when too close
+            end
+        else
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine, HPBar, NameText, DistanceText}) do
+                Line.Visible = false
+            end
+        end
+    end
+
+    RunService.RenderStepped:Connect(UpdateESP)
+end
+
+for _, Player in pairs(Players:GetPlayers()) do
+    if Player ~= LocalPlayer then
+        CreateESP(Player)
+    end
+end
+
+Players.PlayerAdded:Connect(CreateESP)
