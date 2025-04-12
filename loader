@@ -1,17 +1,663 @@
-local placeId = game.PlaceId
+-- Enhanced Game Loader UI with dark mode, search, drag, and animations
+local allowedGames = {
+    ["Hunters"] = {
+        url = "https://raw.githubusercontent.com/JiwooAXH/hunters/main/loader",
+        ids = {72992062125248}
+    },
+    ["Blue Lock: Rivals"] = {
+        url = "https://pastes.io/raw/bl-rivals",
+        ids = {18668065416}
+    },
+    ["Volleyball Legends"] = {
+        url = "https://pastes.io/raw/v-ball-763",
+        ids = {109684591839194, 73956553001240}
+    }
+}
 
-if placeId == 72992062125248 then
-    -- Hunters
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/JiwooAXH/hunters/main/loader"))()
+-- Constants and services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
-elseif placeId == 18668065416 then
-    -- BL: Rivals
-    loadstring(game:HttpGet("https://pastes.io/raw/bl-rivals", true))()
+-- Color theme
+local COLORS = {
+    BACKGROUND = Color3.fromRGB(18, 18, 23),
+    CARD = Color3.fromRGB(25, 25, 32),
+    ACCENT = Color3.fromRGB(86, 104, 255),
+    TEXT_PRIMARY = Color3.fromRGB(240, 240, 245),
+    TEXT_SECONDARY = Color3.fromRGB(180, 180, 190),
+    BUTTON_HOVER = Color3.fromRGB(35, 35, 45),
+    ERROR = Color3.fromRGB(255, 80, 80),
+    TOGGLE_ON = Color3.fromRGB(75, 180, 100),
+    TOGGLE_OFF = Color3.fromRGB(120, 120, 130)
+}
 
-elseif placeId == 109684591839194 or placeId == 73956553001240 then
-    -- V-Ball (Made by: Nayeon)
-    loadstring(game:HttpGet("https://pastes.io/raw/v-ball-763", true))()
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GameSelectorUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = game:GetService("CoreGui")
 
-else
-    warn("Unsupported game. This loader only works in Hunters, BL: Rivals, or V-Ball.")
+-- Create main container
+local mainFrame = Instance.new("Frame")
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.Size = UDim2.new(0, 350, 0, 400)
+mainFrame.BackgroundColor3 = COLORS.BACKGROUND
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+-- Add rounded corners
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 12)
+
+-- Add shadow effect
+local shadow = Instance.new("ImageLabel")
+shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+shadow.BackgroundTransparency = 1
+shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+shadow.Size = UDim2.new(1, 30, 1, 30)
+shadow.ZIndex = -1
+shadow.Image = "rbxassetid://6014054906"
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.5
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(128, 128, 128, 128)
+shadow.SliceScale = 0.02
+shadow.Parent = mainFrame
+
+-- Add animated border glow
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Color = Color3.fromRGB(255, 255, 255)
+stroke.Thickness = 1.5
+stroke.Transparency = 0.7
+
+-- Create header section
+local headerFrame = Instance.new("Frame")
+headerFrame.Size = UDim2.new(1, 0, 0, 60)
+headerFrame.BackgroundColor3 = COLORS.CARD
+headerFrame.BackgroundTransparency = 0.3
+headerFrame.BorderSizePixel = 0
+headerFrame.Parent = mainFrame
+
+-- Add rounded corners to header
+Instance.new("UICorner", headerFrame).CornerRadius = UDim.new(0, 12)
+
+-- Add title with gradient
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Position = UDim2.new(0, 20, 0, 10)
+titleLabel.Size = UDim2.new(1, -40, 0, 25)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Text = "Game Loader"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 22
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = headerFrame
+
+-- Add subtitle
+local subtitleLabel = Instance.new("TextLabel")
+subtitleLabel.Position = UDim2.new(0, 20, 0, 35)
+subtitleLabel.Size = UDim2.new(1, -40, 0, 20)
+subtitleLabel.BackgroundTransparency = 1
+subtitleLabel.Font = Enum.Font.Gotham
+subtitleLabel.Text = "Select a game to load"
+subtitleLabel.TextColor3 = COLORS.TEXT_SECONDARY
+subtitleLabel.TextSize = 14
+subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+subtitleLabel.Parent = headerFrame
+
+-- Add close button (Fixed to properly close the GUI)
+local closeButton = Instance.new("TextButton")
+closeButton.Position = UDim2.new(1, -40, 0, 10)
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.AnchorPoint = Vector2.new(0, 0)
+closeButton.BackgroundColor3 = COLORS.BACKGROUND
+closeButton.Text = "×"
+closeButton.TextColor3 = COLORS.TEXT_SECONDARY
+closeButton.TextSize = 24
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Parent = headerFrame
+
+Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 8)
+
+-- Add search bar
+local searchFrame = Instance.new("Frame")
+searchFrame.Position = UDim2.new(0, 0, 0, 60)
+searchFrame.Size = UDim2.new(1, 0, 0, 50)
+searchFrame.BackgroundTransparency = 1
+searchFrame.Parent = mainFrame
+
+local searchBar = Instance.new("TextBox")
+searchBar.Position = UDim2.new(0, 20, 0, 10)
+searchBar.Size = UDim2.new(1, -40, 0, 30)
+searchBar.BackgroundColor3 = COLORS.CARD
+searchBar.Font = Enum.Font.Gotham
+searchBar.PlaceholderText = "Search games..."
+searchBar.Text = ""
+searchBar.TextColor3 = COLORS.TEXT_PRIMARY
+searchBar.PlaceholderColor3 = COLORS.TEXT_SECONDARY
+searchBar.TextSize = 14
+searchBar.ClearTextOnFocus = false
+searchBar.Parent = searchFrame
+
+Instance.new("UICorner", searchBar).CornerRadius = UDim.new(0, 8)
+
+local searchStroke = Instance.new("UIStroke", searchBar)
+searchStroke.Color = COLORS.TEXT_SECONDARY
+searchStroke.Thickness = 1
+searchStroke.Transparency = 0.8
+
+-- Fixed search icon with proper proportions
+local searchIcon = Instance.new("ImageLabel")
+searchIcon.Position = UDim2.new(0, 8, 0.5, 0)
+searchIcon.Size = UDim2.new(0, 16, 0, 16)
+searchIcon.AnchorPoint = Vector2.new(0, 0.5)
+searchIcon.BackgroundTransparency = 1
+searchIcon.Image = "rbxassetid://10709789200"
+searchIcon.ImageColor3 = COLORS.TEXT_SECONDARY
+searchIcon.Parent = searchBar
+
+-- Create scrolling game list container
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Position = UDim2.new(0, 0, 0, 110)
+scrollingFrame.Size = UDim2.new(1, 0, 1, -150) -- Reduced height to make room for auto-load option
+scrollingFrame.BackgroundTransparency = 1
+scrollingFrame.BorderSizePixel = 0
+scrollingFrame.ScrollBarThickness = 4
+scrollingFrame.ScrollBarImageColor3 = COLORS.ACCENT
+scrollingFrame.ScrollBarImageTransparency = 0.5
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be set dynamically
+scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollingFrame.Parent = mainFrame
+
+-- Create list layout for game buttons
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 8)
+listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+listLayout.SortOrder = Enum.SortOrder.Name
+listLayout.Parent = scrollingFrame
+
+local padding = Instance.new("UIPadding")
+padding.PaddingLeft = UDim.new(0, 20)
+padding.PaddingRight = UDim.new(0, 20)
+padding.PaddingTop = UDim.new(0, 10)
+padding.PaddingBottom = UDim.new(0, 10)
+padding.Parent = scrollingFrame
+
+-- Add "Made by: Yuki" credit text at the bottom left
+local creditsLabel = Instance.new("TextLabel")
+creditsLabel.Position = UDim2.new(0, 15, 1, -25)
+creditsLabel.Size = UDim2.new(0, 100, 0, 20)
+creditsLabel.BackgroundTransparency = 1
+creditsLabel.Font = Enum.Font.Gotham
+creditsLabel.Text = "Made by: Yuki"
+creditsLabel.TextColor3 = COLORS.TEXT_SECONDARY
+creditsLabel.TextSize = 12
+creditsLabel.TextXAlignment = Enum.TextXAlignment.Left
+creditsLabel.TextTransparency = 0.3
+creditsLabel.Parent = mainFrame
+
+-- Create toggle button
+local toggleButton = Instance.new("Frame")
+toggleButton.Position = UDim2.new(0, 250, 0, 10)
+toggleButton.Size = UDim2.new(0, 40, 0, 20)
+toggleButton.AnchorPoint = Vector2.new(0, 0.5)
+toggleButton.BackgroundColor3 = COLORS.TOGGLE_OFF
+toggleButton.BorderSizePixel = 0
+toggleButton.Parent = autoLoadFrame
+
+Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(1, 0)
+
+-- Toggle indicator
+local toggleIndicator = Instance.new("Frame")
+toggleIndicator.Position = UDim2.new(0, 2, 0.5, 0)
+toggleIndicator.Size = UDim2.new(0, 16, 0, 16)
+toggleIndicator.AnchorPoint = Vector2.new(0, 0.5)
+toggleIndicator.BackgroundColor3 = COLORS.TEXT_PRIMARY
+toggleIndicator.BorderSizePixel = 0
+toggleIndicator.Parent = toggleButton
+
+Instance.new("UICorner", toggleIndicator).CornerRadius = UDim.new(1, 0)
+
+-- Make toggle button clickable
+local toggleClickArea = Instance.new("TextButton")
+toggleClickArea.Size = UDim2.new(1, 0, 1, 0)
+toggleClickArea.BackgroundTransparency = 1
+toggleClickArea.Text = ""
+toggleClickArea.Parent = toggleButton
+
+-- Toggle function
+local function updateToggle()
+    autoLoadEnabled = not autoLoadEnabled
+    
+    if autoLoadEnabled then
+        TweenService:Create(toggleButton, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.TOGGLE_ON}):Play()
+        TweenService:Create(toggleIndicator, TweenInfo.new(0.3), {Position = UDim2.new(1, -18, 0.5, 0)}):Play()
+        subtitleLabel.Text = "Auto-loading enabled"
+    else
+        TweenService:Create(toggleButton, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.TOGGLE_OFF}):Play()
+        TweenService:Create(toggleIndicator, TweenInfo.new(0.3), {Position = UDim2.new(0, 2, 0.5, 0)}):Play()
+        subtitleLabel.Text = "Select a game to load"
+    end
 end
+
+toggleClickArea.MouseButton1Click:Connect(updateToggle)
+
+-- Function to load a game script
+local function loadGame(gameName, gameData)
+    -- Show loading animation
+    local loadingFrame = Instance.new("Frame")
+    loadingFrame.Size = UDim2.new(1, 0, 1, 0)
+    loadingFrame.BackgroundColor3 = COLORS.BACKGROUND
+    loadingFrame.BackgroundTransparency = 0.3
+    loadingFrame.ZIndex = 10
+    loadingFrame.Parent = mainFrame
+    
+    local loadingText = Instance.new("TextLabel")
+    loadingText.AnchorPoint = Vector2.new(0.5, 0.5)
+    loadingText.Position = UDim2.new(0.5, 0, 0.5, 0)
+    loadingText.Size = UDim2.new(0, 200, 0, 30)
+    loadingText.BackgroundTransparency = 1
+    loadingText.Font = Enum.Font.GothamSemibold
+    loadingText.Text = "Loading " .. gameName .. "..."
+    loadingText.TextColor3 = COLORS.TEXT_PRIMARY
+    loadingText.TextSize = 18
+    loadingText.ZIndex = 11
+    loadingText.Parent = loadingFrame
+    
+    -- Create loading spinner
+    local spinner = Instance.new("ImageLabel")
+    spinner.AnchorPoint = Vector2.new(0.5, 0.5)
+    spinner.Position = UDim2.new(0.5, 0, 0.5, -50)
+    spinner.Size = UDim2.new(0, 50, 0, 50)
+    spinner.BackgroundTransparency = 1
+    spinner.Image = "rbxassetid://4521875682" -- Loading spinner image
+    spinner.ImageColor3 = COLORS.ACCENT
+    spinner.ZIndex = 11
+    spinner.Parent = loadingFrame
+    
+    -- Animate the spinner
+    local spinnerRotation = 0
+    local spinnerConnection
+    spinnerConnection = RunService.RenderStepped:Connect(function()
+        spinnerRotation = spinnerRotation + 5
+        spinner.Rotation = spinnerRotation
+    end)
+    
+    -- Fade out animation
+    task.spawn(function()
+        task.wait(0.5) -- Wait a bit to show the loading screen
+        
+        -- Fade out animation
+        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local fadeOutTween = TweenService:Create(mainFrame, tweenInfo, {Position = UDim2.new(0.5, 0, 1.5, 0)})
+        fadeOutTween:Play()
+        
+        fadeOutTween.Completed:Wait()
+        spinnerConnection:Disconnect()
+        screenGui:Destroy()
+        
+        -- Load the game script
+        loadstring(game:HttpGet(gameData.url, true))()
+    end)
+end
+
+-- Show error notification
+local function showError(message)
+    -- Error notification
+    local errorFrame = Instance.new("Frame")
+    errorFrame.AnchorPoint = Vector2.new(0.5, 0)
+    errorFrame.Position = UDim2.new(0.5, 0, 0, -100) -- Start off-screen
+    errorFrame.Size = UDim2.new(0.9, 0, 0, 60)
+    errorFrame.BackgroundColor3 = COLORS.ERROR
+    errorFrame.BackgroundTransparency = 0.1
+    errorFrame.ZIndex = 20
+    errorFrame.Parent = screenGui
+    
+    Instance.new("UICorner", errorFrame).CornerRadius = UDim.new(0, 10)
+    
+    local errorIcon = Instance.new("ImageLabel")
+    errorIcon.Position = UDim2.new(0, 15, 0.5, 0)
+    errorIcon.AnchorPoint = Vector2.new(0, 0.5)
+    errorIcon.Size = UDim2.new(0, 24, 0, 24)
+    errorIcon.BackgroundTransparency = 1
+    errorIcon.Image = "rbxassetid://6031071053" -- Warning icon
+    errorIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    errorIcon.ZIndex = 21
+    errorIcon.Parent = errorFrame
+    
+    local errorText = Instance.new("TextLabel")
+    errorText.Position = UDim2.new(0, 50, 0, 0)
+    errorText.Size = UDim2.new(1, -60, 1, 0)
+    errorText.BackgroundTransparency = 1
+    errorText.Font = Enum.Font.GothamSemibold
+    errorText.Text = message
+    errorText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    errorText.TextSize = 14
+    errorText.TextWrapped = true
+    errorText.TextXAlignment = Enum.TextXAlignment.Left
+    errorText.ZIndex = 21
+    errorText.Parent = errorFrame
+    
+    -- Animate the error notification
+    local tweenIn = TweenService:Create(errorFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0, 20)})
+    tweenIn:Play()
+    
+    task.delay(3, function()
+        local tweenOut = TweenService:Create(errorFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(0.5, 0, 0, -100)})
+        tweenOut:Play()
+        
+        tweenOut.Completed:Wait()
+        errorFrame:Destroy()
+    end)
+end
+
+-- Function to check if a game is valid for current place
+local function isValidGame(gameData)
+    local currentPlaceId = game.PlaceId
+    for _, id in pairs(gameData.ids) do
+        if currentPlaceId == id then
+            return true
+        end
+    end
+    return false
+end
+
+-- Function to attempt auto-loading if enabled
+local function tryAutoLoad()
+    if not autoLoadEnabled then return end
+    
+    -- Find a compatible game
+    for gameName, gameData in pairs(allowedGames) do
+        if isValidGame(gameData) then
+            subtitleLabel.Text = "Auto-loading: " .. gameName
+            -- Wait a moment before loading to give user a chance to see what's happening
+            task.delay(autoLoadDelay, function()
+                loadGame(gameName, gameData)
+            end)
+            return
+        end
+    end
+    
+    -- If we get here, no compatible game was found
+    showError("No compatible game found for auto-load")
+    autoLoadEnabled = false
+    updateToggle()
+end
+
+-- Function to create and add game buttons
+local allButtons = {}
+local function createGameButtons(filter)
+    -- Clear existing buttons
+    for _, button in pairs(allButtons) do
+        button:Destroy()
+    end
+    allButtons = {}
+    
+    -- Add game buttons based on filter
+    for gameName, gameData in pairs(allowedGames) do
+        if not filter or string.find(string.lower(gameName), string.lower(filter)) then
+            local button = Instance.new("TextButton")
+            button.Name = gameName
+            button.Size = UDim2.new(1, 0, 0, 50)
+            button.BackgroundColor3 = COLORS.CARD
+            button.Text = ""
+            button.AutoButtonColor = false
+            button.Parent = scrollingFrame
+            
+            Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
+            
+            local buttonStroke = Instance.new("UIStroke", button)
+            buttonStroke.Color = COLORS.TEXT_SECONDARY
+            buttonStroke.Thickness = 1
+            buttonStroke.Transparency = 0.9
+            
+            local titleLabel = Instance.new("TextLabel")
+            titleLabel.Position = UDim2.new(0, 15, 0, 5)
+            titleLabel.Size = UDim2.new(1, -30, 0, 25)
+            titleLabel.BackgroundTransparency = 1
+            titleLabel.Font = Enum.Font.GothamSemibold
+            titleLabel.Text = gameName
+            titleLabel.TextColor3 = COLORS.TEXT_PRIMARY
+            titleLabel.TextSize = 16
+            titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+            titleLabel.Parent = button
+            
+            local detailLabel = Instance.new("TextLabel")
+            detailLabel.Position = UDim2.new(0, 15, 0, 28)
+            detailLabel.Size = UDim2.new(1, -30, 0, 18)
+            detailLabel.BackgroundTransparency = 1
+            detailLabel.Font = Enum.Font.Gotham
+            detailLabel.Text = #gameData.ids .. " compatible game(s)"
+            detailLabel.TextColor3 = COLORS.TEXT_SECONDARY
+            detailLabel.TextSize = 12
+            detailLabel.TextXAlignment = Enum.TextXAlignment.Left
+            detailLabel.Parent = button
+            
+            -- Add icon on the right
+            local iconLabel = Instance.new("ImageLabel")
+            iconLabel.Position = UDim2.new(1, -30, 0.5, 0)
+            iconLabel.Size = UDim2.new(0, 20, 0, 20)
+            iconLabel.AnchorPoint = Vector2.new(0, 0.5)
+            iconLabel.BackgroundTransparency = 1
+            iconLabel.Image = "rbxassetid://6031094670" -- Right arrow icon
+            iconLabel.ImageColor3 = COLORS.TEXT_SECONDARY
+            iconLabel.Parent = button
+            
+            -- Button hover effect
+            button.MouseEnter:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.BUTTON_HOVER}):Play()
+                TweenService:Create(buttonStroke, TweenInfo.new(0.3), {Transparency = 0.7}):Play()
+                TweenService:Create(iconLabel, TweenInfo.new(0.3), {ImageColor3 = COLORS.ACCENT}):Play()
+            end)
+            
+            button.MouseLeave:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.CARD}):Play()
+                TweenService:Create(buttonStroke, TweenInfo.new(0.3), {Transparency = 0.9}):Play()
+                TweenService:Create(iconLabel, TweenInfo.new(0.3), {ImageColor3 = COLORS.TEXT_SECONDARY}):Play()
+            end)
+            
+            -- Click animation
+            button.MouseButton1Down:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.1), {Size = UDim2.new(0.98, 0, 0, 50), Position = UDim2.new(0.01, 0, 0, button.Position.Y.Offset)}):Play()
+            end)
+            
+            button.MouseButton1Up:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 0, 50), Position = UDim2.new(0, 0, 0, button.Position.Y.Offset)}):Play()
+            end)
+            
+            -- Button functionality
+            button.MouseButton1Click:Connect(function()
+                if isValidGame(gameData) then
+                    loadGame(gameName, gameData)
+                else
+                    showError("This script does not support this game!")
+                end
+            end)
+            
+            table.insert(allButtons, button)
+        end
+    end
+end
+
+-- Search functionality
+searchBar.Changed:Connect(function(property)
+    if property == "Text" then
+        createGameButtons(searchBar.Text)
+    end
+end)
+
+-- Initialize the game buttons
+createGameButtons()
+
+-- Make the frame draggable for both PC and mobile
+local isDragging = false
+local dragInput
+local dragStart
+local startPos
+
+-- Function to update drag
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    TweenService:Create(mainFrame, TweenInfo.new(0.1), {Position = position}):Play()
+end
+
+-- Header serves as drag handle
+headerFrame.InputBegan:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        isDragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        -- Ripple effect at click position
+        local ripple = Instance.new("Frame")
+        ripple.Size = UDim2.new(0, 0, 0, 0)
+        ripple.Position = UDim2.new(0, input.Position.X - headerFrame.AbsolutePosition.X, 0, input.Position.Y - headerFrame.AbsolutePosition.Y)
+        ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+        ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        ripple.BackgroundTransparency = 0.7
+        ripple.BorderSizePixel = 0
+        ripple.ZIndex = 10
+        Instance.new("UICorner", ripple).CornerRadius = UDim.new(1, 0)
+        ripple.Parent = headerFrame
+        
+        -- Animate ripple
+        TweenService:Create(ripple, TweenInfo.new(0.5), {Size = UDim2.new(0, 100, 0, 100), BackgroundTransparency = 1}):Play()
+        game:GetService("Debris"):AddItem(ripple, 0.5)
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDragging = false
+            end
+        end)
+    end
+end)
+
+headerFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and isDragging then
+        updateDrag(input)
+    end
+end)
+
+-- Mobile swipe handling for game selection
+if isMobile then
+    local startTouch, currentIndex = nil, 1
+    local gameNames = {}
+
+    -- Collect all game names
+    for gameName, _ in pairs(allowedGames) do
+        table.insert(gameNames, gameName)
+    end
+    table.sort(gameNames)
+
+    -- Handle touch for swipe navigation
+    scrollingFrame.TouchStarted:Connect(function(touch)
+        startTouch = touch.Position
+    end)
+
+    scrollingFrame.TouchEnded:Connect(function(touch)
+        if startTouch then
+            local endTouch = touch.Position
+            local deltaY = endTouch.Y - startTouch.Y
+
+            -- If significant vertical swipe
+            if math.abs(deltaY) > 50 then
+                if deltaY > 0 then
+                    -- Swipe down - go to previous game
+                    currentIndex = math.max(1, currentIndex - 1)
+                else
+                    -- Swipe up - go to next game
+                    currentIndex = math.min(#gameNames, currentIndex + 1)
+                end
+
+                -- Scroll to the selected game
+                for _, button in pairs(allButtons) do
+                    if button.Name == gameNames[currentIndex] then
+                        scrollingFrame:TweenPosition(
+                            UDim2.new(0, 0, 0, -button.Position.Y.Offset + 110),
+                            Enum.EasingDirection.Out,
+                            Enum.EasingStyle.Quad,
+                            0.3,
+                            true
+                        )
+
+                        -- Highlight the selected button
+                        for _, otherButton in pairs(allButtons) do
+                            if otherButton == button then
+                                TweenService:Create(otherButton, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.BUTTON_HOVER}):Play()
+                            else
+                                -- Ensure TweenService is correctly chained
+                                TweenService:Create(otherButton, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.CARD}):Play()
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+
+            startTouch = nil
+        end
+    end)
+end
+
+-- Fixed close button functionality
+closeButton.MouseButton1Click:Connect(function()
+    -- Fade out and destroy
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local fadeOutTween = TweenService:Create(mainFrame, tweenInfo, {Position = UDim2.new(1.5, 0, 0.5, 0)})
+    fadeOutTween:Play()
+    
+    task.delay(0.5, function()
+        screenGui:Destroy()
+    end)
+end)
+
+-- Initial animation - fade in
+mainFrame.Position = UDim2.new(0.5, 0, -0.5, 0)
+TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
+
+-- Add color cycling animation for the border and title
+local function lerpColor(color1, color2, alpha)
+    return Color3.new(
+        color1.R + (color2.R - color1.R) * alpha,
+        color1.G + (color2.G - color1.G) * alpha,
+        color1.B + (color2.B - color1.B) * alpha
+    )
+end
+
+-- Title color animation (white to light gray)
+local titleColorWhite = Color3.fromRGB(255, 255, 255)
+local titleColorLightGray = Color3.fromRGB(200, 200, 200)
+local titleColorCycle = 0
+
+-- Border color animation (white to black)
+local borderColorWhite = Color3.fromRGB(255, 255, 255)
+local borderColorBlack = Color3.fromRGB(40, 40, 40)
+local borderColorCycle = 0
+
+-- Set up render stepped connection for color cycling animations
+RunService.RenderStepped:Connect(function(deltaTime)
+    -- Update title color cycling
+    titleColorCycle = (titleColorCycle + deltaTime * 0.5) % 1
+    local titleColorValue = math.abs(math.sin(titleColorCycle * math.pi))
+    titleLabel.TextColor3 = lerpColor(titleColorWhite, titleColorLightGray, titleColorValue)
+    
+    -- Update border color cycling
+    borderColorCycle = (borderColorCycle + deltaTime * 0.3) % 1
+    local borderColorValue = math.abs(math.sin(borderColorCycle * math.pi))
+    stroke.Color = lerpColor(borderColorWhite, borderColorBlack, borderColorValue)
+end)
+                                
+                                
+                                
