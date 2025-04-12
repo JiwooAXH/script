@@ -524,4 +524,142 @@ headerFrame.InputBegan:Connect(function(input)
         ripple.Position = UDim2.new(0, input.Position.X - headerFrame.AbsolutePosition.X, 0, input.Position.Y - headerFrame.AbsolutePosition.Y)
         ripple.AnchorPoint = Vector2.new(0.5, 0.5)
         ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        ripple.B
+        ripple.BackgroundTransparency = 0.7
+        ripple.BorderSizePixel = 0
+        ripple.ZIndex = 10
+        Instance.new("UICorner", ripple).CornerRadius = UDim.new(1, 0)
+        ripple.Parent = headerFrame
+        
+        -- Animate ripple
+        TweenService:Create(ripple, TweenInfo.new(0.5), {Size = UDim2.new(0, 100, 0, 100), BackgroundTransparency = 1}):Play()
+        game:GetService("Debris"):AddItem(ripple, 0.5)
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDragging = false
+            end
+        end)
+    end
+end)
+
+headerFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and isDragging then
+        updateDrag(input)
+    end
+end)
+
+-- Mobile swipe handling for game selection
+if isMobile then
+    local startTouch, currentIndex = nil, 1
+    local gameNames = {}
+
+    -- Collect all game names
+    for gameName, _ in pairs(allowedGames) do
+        table.insert(gameNames, gameName)
+    end
+    table.sort(gameNames)
+
+    -- Handle touch for swipe navigation
+    scrollingFrame.TouchStarted:Connect(function(touch)
+        startTouch = touch.Position
+    end)
+
+    scrollingFrame.TouchEnded:Connect(function(touch)
+        if startTouch then
+            local endTouch = touch.Position
+            local deltaY = endTouch.Y - startTouch.Y
+
+            -- If significant vertical swipe
+            if math.abs(deltaY) > 50 then
+                if deltaY > 0 then
+                    -- Swipe down - go to previous game
+                    currentIndex = math.max(1, currentIndex - 1)
+                else
+                    -- Swipe up - go to next game
+                    currentIndex = math.min(#gameNames, currentIndex + 1)
+                end
+
+                -- Scroll to the selected game
+                for _, button in pairs(allButtons) do
+                    if button.Name == gameNames[currentIndex] then
+                        scrollingFrame:TweenPosition(
+                            UDim2.new(0, 0, 0, -button.Position.Y.Offset + 110),
+                            Enum.EasingDirection.Out,
+                            Enum.EasingStyle.Quad,
+                            0.3,
+                            true
+                        )
+
+                        -- Highlight the selected button
+                        for _, otherButton in pairs(allButtons) do
+                            if otherButton == button then
+                                TweenService:Create(otherButton, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.BUTTON_HOVER}):Play()
+                            else
+                                -- Ensure TweenService is correctly chained
+                                TweenService:Create(otherButton, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.CARD}):Play()
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+
+            startTouch = nil
+        end
+    end)
+end
+
+-- Fixed close button functionality
+closeButton.MouseButton1Click:Connect(function()
+    -- Fade out and destroy
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local fadeOutTween = TweenService:Create(mainFrame, tweenInfo, {Position = UDim2.new(1.5, 0, 0.5, 0)})
+    fadeOutTween:Play()
+    
+    task.delay(0.5, function()
+        screenGui:Destroy()
+    end)
+end)
+
+-- Initial animation - fade in
+mainFrame.Position = UDim2.new(0.5, 0, -0.5, 0)
+TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
+
+-- Add color cycling animation for the border and title
+local function lerpColor(color1, color2, alpha)
+    return Color3.new(
+        color1.R + (color2.R - color1.R) * alpha,
+        color1.G + (color2.G - color1.G) * alpha,
+        color1.B + (color2.B - color1.B) * alpha
+    )
+end
+
+-- Title color animation (white to light gray)
+local titleColorWhite = Color3.fromRGB(255, 255, 255)
+local titleColorLightGray = Color3.fromRGB(200, 200, 200)
+local titleColorCycle = 0
+
+-- Border color animation (white to black)
+local borderColorWhite = Color3.fromRGB(255, 255, 255)
+local borderColorBlack = Color3.fromRGB(40, 40, 40)
+local borderColorCycle = 0
+
+-- Set up render stepped connection for color cycling animations
+RunService.RenderStepped:Connect(function(deltaTime)
+    -- Update title color cycling
+    titleColorCycle = (titleColorCycle + deltaTime * 0.5) % 1
+    local titleColorValue = math.abs(math.sin(titleColorCycle * math.pi))
+    titleLabel.TextColor3 = lerpColor(titleColorWhite, titleColorLightGray, titleColorValue)
+    
+    -- Update border color cycling
+    borderColorCycle = (borderColorCycle + deltaTime * 0.3) % 1
+    local borderColorValue = math.abs(math.sin(borderColorCycle * math.pi))
+    stroke.Color = lerpColor(borderColorWhite, borderColorBlack, borderColorValue)
+end)
+                                
