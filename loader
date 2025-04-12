@@ -17,7 +17,7 @@ local allowedGames = {
         ids = {}
     },
     ["Blair"] = {
-        url = "https://pastes.io/raw/iiblair-31",
+        url = "https://pastes.io/raw/iiblair-43",
         ids = {}
     }
 }
@@ -468,7 +468,7 @@ local function createGameButtons(filter)
 			detailLabel.Size = UDim2.new(1, -30, 0, 18)
 			detailLabel.BackgroundTransparency = 1
 			detailLabel.Font = Enum.Font.Gotham
-			detailLabel.Text = (#gameData.ids > 0 and (#gameData.ids .. " compatible game(s)")) or "Might work in other game(s)"
+			detailLabel.Text = (#gameData.ids > 0 and (#gameData.ids .. " compatible game(s)")) or "Might not/work in other game(s)"
 			detailLabel.TextColor3 = COLORS.TEXT_SECONDARY
 			detailLabel.TextSize = 12
 			detailLabel.TextXAlignment = Enum.TextXAlignment.Left
