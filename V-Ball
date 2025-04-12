@@ -1,5 +1,45 @@
+--// Fluent Library & Setup
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Volleyball Legends",
+    SubTitle = "Made by: Yuki",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(520, 330),
+    Acrylic = true,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "volleyball" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+--// Variables
 local scaleFactor = 3
 local originalSizes = {}
+local showHitbox = false
+local hitboxEnabled = false
+
+--// Functions
+local function createSphereHitbox(position, size, anchored, parent)
+    local hitbox = Instance.new("Part")
+    hitbox.Name = "VisualHitbox"
+    hitbox.Size = Vector3.new(size, size, size)
+    hitbox.Position = position
+    hitbox.Anchored = anchored
+    hitbox.CanCollide = false
+    hitbox.Transparency = showHitbox and 0.5 or 1
+    hitbox.Material = Enum.Material.ForceField
+    hitbox.Shape = Enum.PartType.Ball
+    hitbox.Color = Color3.fromRGB(255, 0, 0)
+    hitbox.Parent = parent
+end
 
 local function resizeModel(model)
     for _, part in ipairs(model:GetDescendants()) do
@@ -8,18 +48,8 @@ local function resizeModel(model)
                 originalSizes[part] = part.Size
             end
 
-            local newSize = originalSizes[part] * scaleFactor
-
-            -- Create an invisible hitbox
-            local hitbox = Instance.new("Part")
-            hitbox.Size = newSize
-            hitbox.Position = part.Position
-            hitbox.Anchored = part.Anchored
-            hitbox.CanCollide = part.CanCollide
-            hitbox.Transparency = 1 -- Invisible hitbox
-            hitbox.Parent = model
-
-            -- Keep the original ball visible
+            local newSize = (originalSizes[part].X + originalSizes[part].Y + originalSizes[part].Z) / 3 * scaleFactor
+            createSphereHitbox(part.Position, newSize, part.Anchored, model)
             part.Size = originalSizes[part]
         end
     end
@@ -33,18 +63,100 @@ local function findAndResizeBall()
     end
 end
 
-findAndResizeBall()
+local function updateHitboxDisplay()
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and obj.Name:match("^CLIENT_BALL_%d+$") then
+            for _, part in ipairs(obj:GetChildren()) do
+                if part:IsA("Part") and part.Name == "VisualHitbox" then
+                    part.Transparency = showHitbox and 0.5 or 1
+                end
+            end
+        end
+    end
+end
 
+--// UI Elements
+Tabs.Main:AddParagraph({
+    Title = "Ball Hitbox",
+    Content = "Manage ball hitbox visibility and size."
+})
+
+Tabs.Main:AddToggle("EnableHitbox", {
+    Title = "Enable Hitbox",
+    Default = false
+}):OnChanged(function(value)
+    hitboxEnabled = value
+    if value then
+        findAndResizeBall()
+    else
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and obj.Name:match("^CLIENT_BALL_%d+$") then
+                for _, part in ipairs(obj:GetChildren()) do
+                    if part:IsA("Part") and part.Name == "VisualHitbox" then
+                        part:Destroy()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+Tabs.Main:AddToggle("ShowHitbox", {
+    Title = "Show Hitbox",
+    Default = false
+}):OnChanged(function(value)
+    showHitbox = value
+    updateHitboxDisplay()
+end)
+
+Tabs.Main:AddInput("HitboxSize", {
+    Title = "Hitbox Size",
+    Default = "3",
+    Placeholder = "Enter size (e.g., 3)",
+    Numeric = true
+}):OnChanged(function(value)
+    local num = tonumber(value)
+    if num and num > 0 then
+        scaleFactor = num
+        if hitboxEnabled then
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if obj:IsA("Model") and obj.Name:match("^CLIENT_BALL_%d+$") then
+                    for _, part in ipairs(obj:GetChildren()) do
+                        if part:IsA("Part") and part.Name == "VisualHitbox" then
+                            part:Destroy()
+                        end
+                    end
+                end
+            end
+            findAndResizeBall()
+        end
+    end
+end)
+
+-- Listen for new CLIENT_BALL models
 local connection = workspace.ChildAdded:Connect(function(child)
-    if child:IsA("Model") and child.Name:match("^CLIENT_BALL_%d+$") then
+    if hitboxEnabled and child:IsA("Model") and child.Name:match("^CLIENT_BALL_%d+$") then
         resizeModel(child)
     end
 end)
 
 _G.CLIENT_BALL_SCRIPT = connection
 
-game.StarterGui:SetCore("SendNotification", {
-    Title = "Volleyball Legends";
-    Text = "Script is Executed";
-    Duration = 3;
+-- Notifications
+Fluent:Notify({
+    Title = "Volleyball Legends",
+    Content = "Script is Executed",
+    Duration = 3
 })
+
+-- Settings Management
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/VolleyballLegends")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+Window:SelectTab(1)
+SaveManager:LoadAutoloadConfig()
