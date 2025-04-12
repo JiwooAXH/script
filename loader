@@ -11,6 +11,10 @@ local allowedGames = {
     ["Volleyball Legends"] = {
         url = "https://pastes.io/raw/v-ball-763",
         ids = {}
+    },
+    ["Player ESP"] = {
+        url = "https://raw.githubusercontent.com/JiwooAXH/script/main/2D-Box-ESP",
+        ids = {}
     }
 }
 
