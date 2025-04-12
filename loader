@@ -122,6 +122,25 @@ closeButton.TextSize = 24
 closeButton.Font = Enum.Font.GothamBold
 closeButton.Parent = headerFrame
 
+closeButton.MouseButton1Click:Connect(function()
+    -- Fade out animation for the main GUI frame
+    local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3), {
+        Position = UDim2.new(1.5, 0, 0.5, 0),
+        BackgroundTransparency = 1
+    })
+    tween:Play()
+
+    -- Optional: Fade out title and subtitle
+    TweenService:Create(titleLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+    TweenService:Create(subtitleLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+
+    -- Wait for the tween to finish, then destroy the GUI
+    tween.Completed:Wait()
+    if screenGui then
+        screenGui:Destroy()
+    end
+end)
+
 Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 8)
 
 -- Add search bar
@@ -250,13 +269,18 @@ toggleClickArea.MouseButton1Click:Connect(updateToggle)
 -- Function to load a game script
 local function loadGame(gameName, gameData)
     -- Show loading animation
-    local loadingFrame = Instance.new("Frame")
-    loadingFrame.Size = UDim2.new(1, 0, 1, 0)
-    loadingFrame.BackgroundColor3 = COLORS.BACKGROUND
-    loadingFrame.BackgroundTransparency = 0.3
-    loadingFrame.ZIndex = 10
-    loadingFrame.Parent = mainFrame
-    
+	local loadingFrame = Instance.new("Frame")
+	loadingFrame.Size = UDim2.new(1, 0, 1, 0)
+	loadingFrame.BackgroundColor3 = COLORS.BACKGROUND
+	loadingFrame.BackgroundTransparency = 0.3
+	loadingFrame.ZIndex = 10
+	loadingFrame.Parent = mainFrame
+	
+	-- Add rounded corners to loading frame
+	local loadingCorner = Instance.new("UICorner")
+	loadingCorner.CornerRadius = UDim.new(0, 12)
+	loadingCorner.Parent = loadingFrame
+
     local loadingText = Instance.new("TextLabel")
     loadingText.AnchorPoint = Vector2.new(0.5, 0.5)
     loadingText.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -431,17 +455,17 @@ local function createGameButtons(filter)
             titleLabel.TextXAlignment = Enum.TextXAlignment.Left
             titleLabel.Parent = button
             
-            local detailLabel = Instance.new("TextLabel")
-            detailLabel.Position = UDim2.new(0, 15, 0, 28)
-            detailLabel.Size = UDim2.new(1, -30, 0, 18)
-            detailLabel.BackgroundTransparency = 1
-            detailLabel.Font = Enum.Font.Gotham
-            detailLabel.Text = #gameData.ids .. " compatible game(s)"
-            detailLabel.TextColor3 = COLORS.TEXT_SECONDARY
-            detailLabel.TextSize = 12
-            detailLabel.TextXAlignment = Enum.TextXAlignment.Left
-            detailLabel.Parent = button
-            
+		    local detailLabel = Instance.new("TextLabel")
+			detailLabel.Position = UDim2.new(0, 15, 0, 28)
+			detailLabel.Size = UDim2.new(1, -30, 0, 18)
+			detailLabel.BackgroundTransparency = 1
+			detailLabel.Font = Enum.Font.Gotham
+			detailLabel.Text = (#gameData.ids > 0 and (#gameData.ids .. " compatible game(s)")) or "Compatible in other games"
+			detailLabel.TextColor3 = COLORS.TEXT_SECONDARY
+			detailLabel.TextSize = 12
+			detailLabel.TextXAlignment = Enum.TextXAlignment.Left
+			detailLabel.Parent = button
+
             -- Add icon on the right
             local iconLabel = Instance.new("ImageLabel")
             iconLabel.Position = UDim2.new(1, -30, 0.5, 0)
