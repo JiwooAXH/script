@@ -1,0 +1,17 @@
+local placeId = game.PlaceId
+
+if placeId == 72992062125248 then
+    -- Hunters
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/JiwooAXH/hunters/main/loader"))()
+
+elseif placeId == 18668065416 then
+    -- BL: Rivals
+    loadstring(game:HttpGet("https://pastes.io/raw/bl-rivals", true))()
+
+elseif placeId == 109684591839194 or placeId == 73956553001240 then
+    -- V-Ball (Made by: Nayeon)
+    loadstring(game:HttpGet("https://pastes.io/raw/v-ball-763", true))()
+
+else
+    warn("Unsupported game. This loader only works in Hunters, BL: Rivals, or V-Ball.")
+end
