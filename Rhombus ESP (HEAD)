@@ -1,0 +1,155 @@
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Teams = game:GetService("Teams")
+
+local function CreateESP(Player)
+    if Player == LocalPlayer then return end -- Exclude local player
+    
+    -- Create four separate lines for the box outline
+    local TopLine = Drawing.new("Line")
+    local BottomLine = Drawing.new("Line")
+    local LeftLine = Drawing.new("Line")
+    local RightLine = Drawing.new("Line")
+    
+    -- Function to rotate a point around a center by an angle in degrees
+    local function RotatePoint(point, center, angle)
+        local rad = math.rad(angle)
+        local cosA = math.cos(rad)
+        local sinA = math.sin(rad)
+        local x = cosA * (point.X - center.X) - sinA * (point.Y - center.Y) + center.X
+        local y = sinA * (point.X - center.X) + cosA * (point.Y - center.Y) + center.Y
+        return Vector2.new(x, y)
+    end
+
+    -- Function to check if player is alive and active
+    local function IsPlayerActive(player)
+        if not player or not player.Character then return false end
+        
+        local character = player.Character
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        
+        if not humanoid then return false end
+        
+        -- Check if player is dead
+        if humanoid.Health <= 0 then return false end
+        
+        -- Check for common ragdoll/down states
+        if humanoid:GetState() == Enum.HumanoidStateType.Dead then return false end
+        if humanoid:GetState() == Enum.HumanoidStateType.Physics then return false end -- Often used for ragdolls
+        
+        -- Check for custom attributes that might indicate downed state
+        if character:GetAttribute("Downed") or character:GetAttribute("Ragdolled") then return false end
+        if humanoid:GetAttribute("Downed") or humanoid:GetAttribute("Ragdolled") then return false end
+        
+        -- Check for common naming patterns in games for downed players
+        local downedValue = character:FindFirstChild("Downed") or character:FindFirstChild("IsDown") or character:FindFirstChild("Ragdolled")
+        if downedValue and (typeof(downedValue) == "BoolValue" or typeof(downedValue) == "IntValue" or typeof(downedValue) == "NumberValue") then
+            if downedValue.Value then return false end
+        end
+        
+        return true -- Player is active if passed all checks
+    end
+
+    local function UpdateESP()
+        -- Hide ESP if player isn't active
+        if not IsPlayerActive(Player) then
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+            return
+        end
+        
+        if not Player.Character or not Player.Character:FindFirstChild("Head") then
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+            return
+        end
+        
+        local Head = Player.Character.Head
+        local Vector, OnScreen = Camera:WorldToViewportPoint(Head.Position)
+
+        -- Determine color based on teams
+        local BoxColor = Color3.fromRGB(255, 255, 255) -- Default white (no team)
+        
+        -- Check if teams exist in the game
+        if #Teams:GetTeams() > 0 then
+            if Player.Team and LocalPlayer.Team then
+                if Player.Team == LocalPlayer.Team then
+                    BoxColor = Color3.fromRGB(0, 0, 255) -- Blue for teammates
+                else
+                    BoxColor = Color3.fromRGB(255, 0, 0) -- Red for enemies
+                end
+            end
+        end
+        
+        -- Update all lines with the appropriate color
+        for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+            Line.Color = BoxColor
+            Line.Thickness = 1.6 -- Set thickness to 1.6 for bolded square
+        end
+
+        if OnScreen then
+            -- Make the square very small, adjusting the size to 10
+            local Size = 8 -- Very small square for the head
+            local Position = Vector2.new(Vector.X - Size / 2, Vector.Y - Size / 2)
+
+            -- Calculate the center of the square
+            local Center = Position + Vector2.new(Size / 2, Size / 2)
+            
+            -- Define the four corners of the square before rotation
+            local TopLeft = Position
+            local TopRight = Position + Vector2.new(Size, 0)
+            local BottomLeft = Position + Vector2.new(0, Size)
+            local BottomRight = Position + Vector2.new(Size, Size)
+            
+            -- Rotate the corners by 50 degrees
+            TopLeft = RotatePoint(TopLeft, Center, 50)
+            TopRight = RotatePoint(TopRight, Center, 50)
+            BottomLeft = RotatePoint(BottomLeft, Center, 50)
+            BottomRight = RotatePoint(BottomRight, Center, 50)
+
+            -- Define box outline using the rotated points
+            TopLine.From = TopLeft
+            TopLine.To = TopRight
+            
+            BottomLine.From = BottomLeft
+            BottomLine.To = BottomRight
+            
+            LeftLine.From = TopLeft
+            LeftLine.To = BottomLeft
+            
+            RightLine.From = TopRight
+            RightLine.To = BottomRight
+
+            -- Ensure the ESP box is always visible
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = true
+            end
+        else
+            -- Hide all when not on screen
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+        end
+    end
+
+    -- Set up character added event to handle respawns
+    Player.CharacterAdded:Connect(function(character)
+        -- ESP will automatically update on the next RenderStepped
+    end)
+
+    RunService.RenderStepped:Connect(UpdateESP)
+end
+
+-- Create ESP for existing players
+for _, Player in pairs(Players:GetPlayers()) do
+    if Player ~= LocalPlayer then
+        CreateESP(Player)
+    end
+end
+
+-- Create ESP when new players join
+Players.PlayerAdded:Connect(CreateESP)
