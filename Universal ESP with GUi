@@ -1,0 +1,322 @@
+-- Load Fluent UI and Addons
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- Create Fluent Window
+local Window = Fluent:CreateWindow({
+    Title = "Universal ESP",
+    SubTitle = "Made by: Yuki",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(520, 340),
+    Acrylic = true,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "ESP", Icon = "eye" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+-- ESP Configuration Variables
+local ESPEnabled = true
+local DistanceOnly = false
+local MaxDistance = 100
+local ShowDistance = false
+local ShowName = false
+
+-- === ESP Tab UI ===
+Tabs.Main:AddToggle("ESPEnabled", {
+    Title = "Enable ESP",
+    Default = true
+}):OnChanged(function(state)
+    ESPEnabled = state
+end)
+
+Tabs.Main:AddParagraph({
+    Title = "Distance Options",
+    Content = "Control whether ESP only works within a specific range."
+})
+
+Tabs.Main:AddToggle("DistanceOnly", {
+    Title = "Distance Based",
+    Default = false
+}):OnChanged(function(state)
+    DistanceOnly = state
+end)
+
+Tabs.Main:AddInput("MaxDistance", {
+    Title = "Max Distance",
+    Placeholder = "Enter distance (e.g., 100)",
+    Default = "100"
+}):OnChanged(function(text)
+    local distance = tonumber(text)
+    if distance and distance > 0 then
+        MaxDistance = distance
+    end
+end)
+
+Tabs.Main:AddParagraph({
+    Title = "Display Options",
+    Content = "Control what information is shown in the ESP."
+})
+
+Tabs.Main:AddToggle("ShowDistance", {
+    Title = "Show Real-time Distance",
+    Default = false
+}):OnChanged(function(state)
+    ShowDistance = state
+end)
+
+Tabs.Main:AddToggle("ShowName", {
+    Title = "Show Player Names",
+    Default = false
+}):OnChanged(function(state)
+    ShowName = state
+end)
+
+-- ESP Core Functionality
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Teams = game:GetService("Teams")
+
+local function CreateESP(Player)
+    if Player == LocalPlayer then return end -- Exclude local player
+    
+    -- Create four separate lines for the box outline
+    local TopLine = Drawing.new("Line")
+    local BottomLine = Drawing.new("Line")
+    local LeftLine = Drawing.new("Line")
+    local RightLine = Drawing.new("Line")
+    
+    -- Create text labels for distance and name
+    local DistanceText = Drawing.new("Text")
+    local NameText = Drawing.new("Text")
+    
+    -- Configure text appearance for pixelated style
+    for _, Text in pairs({DistanceText, NameText}) do
+        Text.Size = 14
+        Text.Center = true
+        Text.Outline = true
+        Text.OutlineColor = Color3.fromRGB(0, 0, 0)
+        Text.Font = 2 -- Use SourceSans font which can appear pixelated at small sizes
+    end
+    
+    -- Function to rotate a point around a center by an angle in degrees
+    local function RotatePoint(point, center, angle)
+        local rad = math.rad(angle)
+        local cosA = math.cos(rad)
+        local sinA = math.sin(rad)
+        local x = cosA * (point.X - center.X) - sinA * (point.Y - center.Y) + center.X
+        local y = sinA * (point.X - center.X) + cosA * (point.Y - center.Y) + center.Y
+        return Vector2.new(x, y)
+    end
+
+    -- Function to check if player is alive and active
+    local function IsPlayerActive(player)
+        if not player or not player.Character then return false end
+        
+        local character = player.Character
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        
+        if not humanoid then return false end
+        
+        -- Check if player is dead
+        if humanoid.Health <= 0 then return false end
+        
+        -- Check for common ragdoll/down states
+        if humanoid:GetState() == Enum.HumanoidStateType.Dead then return false end
+        if humanoid:GetState() == Enum.HumanoidStateType.Physics then return false end -- Often used for ragdolls
+        
+        -- Check for custom attributes that might indicate downed state
+        if character:GetAttribute("Downed") or character:GetAttribute("Ragdolled") then return false end
+        if humanoid:GetAttribute("Downed") or humanoid:GetAttribute("Ragdolled") then return false end
+        
+        -- Check for common naming patterns in games for downed players
+        local downedValue = character:FindFirstChild("Downed") or character:FindFirstChild("IsDown") or character:FindFirstChild("Ragdolled")
+        if downedValue and (typeof(downedValue) == "BoolValue" or typeof(downedValue) == "IntValue" or typeof(downedValue) == "NumberValue") then
+            if downedValue.Value then return false end
+        end
+        
+        return true -- Player is active if passed all checks
+    end
+
+    local function UpdateESP()
+        -- Check if ESP is enabled globally
+        if not ESPEnabled then
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+            DistanceText.Visible = false
+            NameText.Visible = false
+            return
+        end
+        
+        -- Hide ESP if player isn't active
+        if not IsPlayerActive(Player) then
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+            DistanceText.Visible = false
+            NameText.Visible = false
+            return
+        end
+        
+        if not Player.Character or not Player.Character:FindFirstChild("Head") then
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+            DistanceText.Visible = false
+            NameText.Visible = false
+            return
+        end
+        
+        local Head = Player.Character.Head
+        local Vector, OnScreen = Camera:WorldToViewportPoint(Head.Position)
+        
+        -- Calculate distance
+        local distance = (Camera.CFrame.Position - Head.Position).Magnitude
+        local distanceRounded = math.floor(distance)
+        
+        -- Check distance if distance-based mode is enabled
+        if DistanceOnly and distance > MaxDistance then
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+            DistanceText.Visible = false
+            NameText.Visible = false
+            return
+        end
+
+        -- Determine color based on teams
+        local BoxColor = Color3.fromRGB(255, 255, 255) -- Default white (no team)
+        
+        -- Check if teams exist in the game
+        if #Teams:GetTeams() > 0 then
+            if Player.Team and LocalPlayer.Team then
+                if Player.Team == LocalPlayer.Team then
+                    BoxColor = Color3.fromRGB(0, 0, 255) -- Blue for teammates
+                else
+                    BoxColor = Color3.fromRGB(255, 0, 0) -- Red for enemies
+                end
+            end
+        end
+        
+        -- Update all lines with the appropriate color
+        for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+            Line.Color = BoxColor
+            Line.Thickness = 1.6 -- Set thickness to 1.6 for bolded square
+        end
+        
+        -- Update text colors to match the box
+        DistanceText.Color = BoxColor
+        NameText.Color = BoxColor
+
+        if OnScreen then
+            -- Make the square very small, adjusting the size to 10
+            local Size = 8 -- Very small square for the head
+            local Position = Vector2.new(Vector.X - Size / 2, Vector.Y - Size / 2)
+
+            -- Calculate the center of the square
+            local Center = Position + Vector2.new(Size / 2, Size / 2)
+            
+            -- Define the four corners of the square before rotation
+            local TopLeft = Position
+            local TopRight = Position + Vector2.new(Size, 0)
+            local BottomLeft = Position + Vector2.new(0, Size)
+            local BottomRight = Position + Vector2.new(Size, Size)
+            
+            -- Rotate the corners by 50 degrees
+            TopLeft = RotatePoint(TopLeft, Center, 50)
+            TopRight = RotatePoint(TopRight, Center, 50)
+            BottomLeft = RotatePoint(BottomLeft, Center, 50)
+            BottomRight = RotatePoint(BottomRight, Center, 50)
+
+            -- Define box outline using the rotated points
+            TopLine.From = TopLeft
+            TopLine.To = TopRight
+            
+            BottomLine.From = BottomLeft
+            BottomLine.To = BottomRight
+            
+            LeftLine.From = TopLeft
+            LeftLine.To = BottomLeft
+            
+            RightLine.From = TopRight
+            RightLine.To = BottomRight
+
+            -- Ensure the ESP box is always visible
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = true
+            end
+            
+            -- Update distance text if enabled
+            if ShowDistance then
+                DistanceText.Text = "[" .. distanceRounded .. "m]"
+                DistanceText.Position = Vector2.new(Vector.X, Vector.Y + 20)
+                DistanceText.Visible = true
+            else
+                DistanceText.Visible = false
+            end
+            
+            -- Update name text if enabled
+            if ShowName then
+                local displayName = Player.DisplayName or Player.Name
+                NameText.Text = displayName
+                NameText.Position = Vector2.new(Vector.X, Vector.Y - 20)
+                NameText.Visible = true
+            else
+                NameText.Visible = false
+            end
+        else
+            -- Hide all when not on screen
+            for _, Line in pairs({TopLine, BottomLine, LeftLine, RightLine}) do
+                Line.Visible = false
+            end
+            DistanceText.Visible = false
+            NameText.Visible = false
+        end
+    end
+
+    -- Set up character added event to handle respawns
+    Player.CharacterAdded:Connect(function(character)
+        -- ESP will automatically update on the next RenderStepped
+    end)
+
+    RunService.RenderStepped:Connect(UpdateESP)
+end
+
+-- Create ESP for existing players
+for _, Player in pairs(Players:GetPlayers()) do
+    if Player ~= LocalPlayer then
+        CreateESP(Player)
+    end
+end
+
+-- Create ESP when new players join
+Players.PlayerAdded:Connect(CreateESP)
+
+-- === Settings / Save ===
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/UniversalESP")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Universal ESP",
+    Content = "Script successfully loaded!",
+    Duration = 3
+})
+
+SaveManager:LoadAutoloadConfig()
