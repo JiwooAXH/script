@@ -6,7 +6,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 -- Create Fluent Window
 local Window = Fluent:CreateWindow({
     Title = "Universal ESP",
-    SubTitle = " Made by: Yuki",
+    SubTitle = "   Made by: Yuki",
     TabWidth = 160,
     Size = UDim2.fromOffset(520, 340),
     Acrylic = true,
