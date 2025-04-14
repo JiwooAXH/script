@@ -21,7 +21,7 @@ local allowedGames = {
         ids = {}
     },
     ["Bubble Gum Sim INF"] = {
-        url = "https://pastebin.com/raw/USii7svg",
+        url = "https://pastes.io/raw/bubble-gum-sim-inf",
         ids = {}
     }
 }
