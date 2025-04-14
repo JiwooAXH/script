@@ -22,7 +22,7 @@ local allowedGames = {
     },
     ["Bubble Gum Sim INF"] = {
         url = "https://pastebin.com/raw/USii7svg",
-        ids = {85896571713843}
+        ids = {}
     }
 }
 
