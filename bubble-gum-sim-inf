@@ -17,6 +17,7 @@ local Window = Fluent:CreateWindow({
 local Tabs = {
     Main = Window:AddTab({ Title = "︲Main", Icon = "home" }),
     Islands = Window:AddTab({ Title = "︲Islands", Icon = "globe" }),
+    Claim = Window:AddTab({ Title = "︲Claim", Icon = "gift" }),
     Settings = Window:AddTab({ Title = "︲Settings", Icon = "settings" })
 }
 
@@ -264,6 +265,97 @@ Tabs.Islands:AddButton({
     Description = "Smoothly move to the selected island.",
     Callback = function()
         tweenToIsland(selectedIsland)
+    end
+})
+
+-- CLAIM TAB IMPLEMENTATION
+Tabs.Claim:AddParagraph({
+    Title = "Auto Chest & Gift Claimer",
+    Content = "Select items to auto-claim below.\n\nNote: To claim a Golden Chest, you must have a Golden Key.\nEach Golden Chest requires one Golden Key.\n\nIf it looks like a chest or gift wasn't claimed, it's likely just a visual bug. The reward is still given."
+})
+
+local autoClaimRunning = false
+local selectedItems = {}
+
+-- Chest & gift definitions
+local claimMap = {
+    ["Void Chest"] = { "ClaimChest", "Void Chest" },
+    ["Golden Chest"] = { "UnlockRiftChest", "golden-chest" },
+    ["Giant Chest"] = { "ClaimChest", "Giant Chest" },
+    ["Rift Gift"] = { "ClaimRiftGift", "gift-rift" },
+}
+
+-- Dropdown
+local dropdown = Tabs.Claim:AddDropdown("ClaimDropdown", {
+    Title = "Select Chests/Gifts",
+    Description = "Choose which ones to claim.",
+    Values = { "Void Chest", "Golden Chest", "Giant Chest", "Rift Gift" },
+    Multi = true,
+    Default = {},
+})
+
+dropdown:OnChanged(function(val)
+    selectedItems = {}
+    for name, isEnabled in pairs(val) do
+        if isEnabled then
+            selectedItems[name] = true
+        end
+    end
+end)
+
+-- Toggle
+Tabs.Claim:AddToggle("AutoClaimToggle", {
+    Title = "Enable Auto Claim",
+    Default = false,
+    Callback = function(state)
+        autoClaimRunning = state
+
+        if autoClaimRunning then
+            task.spawn(function()
+                while autoClaimRunning do
+                    for name, active in pairs(selectedItems) do
+                        if active and claimMap[name] then
+                            local args = claimMap[name]
+                            pcall(function()
+                                game:GetService("ReplicatedStorage")
+                                    :WaitForChild("Shared")
+                                    :WaitForChild("Framework")
+                                    :WaitForChild("Network")
+                                    :WaitForChild("Remote")
+                                    :WaitForChild("Event")
+                                    :FireServer(unpack(args))
+                            end)
+                        end
+                    end
+                    task.wait(5) -- Adjust delay if needed
+                end
+            end)
+        end
+    end
+})
+
+-- Claim interval adjustment
+Tabs.Claim:AddInput("ClaimIntervalInput", {
+    Title = "Claim Interval (seconds)",
+    Default = "5",
+    Placeholder = "Enter claim interval...",
+    Numeric = true,
+    Finished = true,
+    Callback = function(value)
+        local num = tonumber(value)
+        if num and num > 0 then
+            Fluent:Notify({
+                Title = "Claim Interval Updated",
+                Content = "Chest/Gift claim interval set to " .. num .. " seconds",
+                Duration = 2
+            })
+        else
+            Fluent:Notify({
+                Title = "Invalid Input",
+                Content = "Please enter a positive number",
+                Duration = 2
+            })
+        end
     end
 })
 
