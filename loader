@@ -22,7 +22,7 @@ local allowedGames = {
     },
     ["Bubble Gum Sim: INF"] = {
         url = "https://pastes.io/raw/bubble-gum-sim-inf",
-        ids = {}
+        ids = {85896571713843}
     }
 }
 
