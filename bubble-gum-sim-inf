@@ -6,7 +6,7 @@ local TweenService = game:GetService("TweenService")
 
 local Window = Fluent:CreateWindow({
     Title = "Bubble Gum Simulator: INF",
-    SubTitle = "     Made by: Yuki",
+    SubTitle = "   v1.2 • Made by: Yuki",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 350),
     Acrylic = true,
