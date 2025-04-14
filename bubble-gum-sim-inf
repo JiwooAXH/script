@@ -1,0 +1,178 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Bubble Gum Simulator: INF",
+    SubTitle = "   Made by: Yuki",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(530, 350),
+    Acrylic = true,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+-- Auto Collect Coin
+Tabs.Main:AddParagraph({
+    Title = "Collect Coin",
+    Content = "Coin will be automatically collected in range if you turn the toggle on."
+})
+
+local autoCollectEnabled = false
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local function getCharacter()
+	local player = Players.LocalPlayer
+	while not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") do
+		player.CharacterAdded:Wait()
+	end
+	return player.Character
+end
+
+local function getTargetFolder()
+	local rendered = workspace:FindFirstChild("Rendered")
+	if not rendered then return nil end
+	local children = rendered:GetChildren()
+	return children[12]
+end
+
+local function getTeleportPart(model)
+	if model:IsA("Model") then
+		if not model.PrimaryPart then
+			for _, part in ipairs(model:GetDescendants()) do
+				if part:IsA("BasePart") then
+					model.PrimaryPart = part
+					break
+				end
+			end
+		end
+		return model.PrimaryPart
+	end
+end
+
+RunService.Heartbeat:Connect(function()
+	if not autoCollectEnabled then return end
+
+	local char = getCharacter()
+	local root = char:FindFirstChild("HumanoidRootPart")
+	local folder = getTargetFolder()
+	if not root or not folder then return end
+
+	for _, model in ipairs(folder:GetChildren()) do
+		local part = getTeleportPart(model)
+		if part then
+			model:SetPrimaryPartCFrame(CFrame.new(
+				root.Position + Vector3.new(math.random(-6,6), 0, math.random(-6,6))
+			))
+		end
+	end
+end)
+
+Tabs.Main:AddToggle("AutoCollectToggle", {
+	Title = "Auto Collect Coin",
+	Default = false,
+	Callback = function(value)
+		autoCollectEnabled = value
+	end
+})
+
+-- Auto Bubble Feature
+Tabs.Main:AddParagraph({
+    Title = "Bubble",
+    Content = "Automatically Blow or Sell bubble actions using the multi dropdown. You can select one or both."
+})
+
+local bubbleEnabled = false
+local selectedBubbleActions = {}
+
+local bubbleDropdown = Tabs.Main:AddDropdown("MultiDropdown", {
+    Title = "Bubble Options",
+    Description = "Select 'BlowBubble' and/or 'SellBubble'",
+    Values = { "BlowBubble", "SellBubble" },
+    Multi = true,
+    Default = {},
+})
+
+bubbleDropdown:OnChanged(function(Value)
+    selectedBubbleActions = {}
+    for val, enabled in pairs(Value) do
+        if enabled then
+            table.insert(selectedBubbleActions, val)
+        end
+    end
+end)
+
+Tabs.Main:AddToggle("BubbleToggle", {
+    Title = "Auto Bubble",
+    Default = false,
+    Callback = function(value)
+        bubbleEnabled = value
+    end
+})
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if bubbleEnabled and #selectedBubbleActions > 0 then
+            for _, action in ipairs(selectedBubbleActions) do
+                local args = { [1] = action }
+                pcall(function()
+                    game:GetService("ReplicatedStorage")
+                        :WaitForChild("Shared")
+                        :WaitForChild("Framework")
+                        :WaitForChild("Network")
+                        :WaitForChild("Remote")
+                        :WaitForChild("Event")
+                        :FireServer(unpack(args))
+                end)
+            end
+        end
+    end
+end)
+
+-- Mobile UI Toggle
+Tabs.Settings:AddParagraph({
+    Title = "Mobile UI Toggle",
+    Content = "For mobile users: Click the button below to add a toggle button that lets you hide/show the GUI."
+})
+
+Tabs.Settings:AddButton({
+    Title = "Load Mobile Toggle Button",
+    Description = "Creates a small button to hide/show the GUI",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JiwooAXH/script/main/Toggle-GUi", true))()
+        Fluent:Notify({
+            Title = "Mobile Toggle Loaded",
+            Content = "You can now use the toggle button to hide/show the GUI",
+            Duration = 5
+        })
+    end
+})
+
+-- SaveManager Setup
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/example-config")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Script Loaded",
+    Content = "The script has been loaded successfully.",
+    Duration = 3
+})
+
+SaveManager:LoadAutoloadConfig()
