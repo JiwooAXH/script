@@ -2,9 +2,11 @@ local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
+local TweenService = game:GetService("TweenService")
+
 local Window = Fluent:CreateWindow({
     Title = "Bubble Gum Simulator: INF",
-    SubTitle = "   Made by: Yuki",
+    SubTitle = "     Made by: Yuki",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 350),
     Acrylic = true,
@@ -13,11 +15,12 @@ local Window = Fluent:CreateWindow({
 })
 
 local Tabs = {
-    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+    Main = Window:AddTab({ Title = "︲Main", Icon = "home" }),
+    Islands = Window:AddTab({ Title = "︲Islands", Icon = "globe" }),
+    Settings = Window:AddTab({ Title = "︲Settings", Icon = "settings" })
 }
 
--- Auto Collect Coin
+-- Main Tab: Auto Collect Coin
 Tabs.Main:AddParagraph({
     Title = "Collect Coin",
     Content = "Coin will be automatically collected in range if you turn the toggle on."
@@ -82,7 +85,7 @@ Tabs.Main:AddToggle("AutoCollectToggle", {
 	end
 })
 
--- Auto Bubble Feature
+-- Main Tab: Auto Bubble Feature
 Tabs.Main:AddParagraph({
     Title = "Bubble Actions",
     Content = "Automatically Blow or Sell bubble actions using the multi dropdown. You can select one or both."
@@ -183,6 +186,86 @@ task.spawn(function()
         end
     end
 end)
+
+-- ISLANDS TAB IMPLEMENTATION
+Tabs.Islands:AddParagraph({
+    Title = "Island TP (Tween)",
+    Content = "Choose an island and smoothly tween to it."
+})
+
+local islandNames = {
+    "Floating Island",
+    "Outer Space",
+    "Twilight",
+    "The Void",
+    "Zen"
+}
+
+local selectedIsland = "Floating Island"
+
+Tabs.Islands:AddDropdown("IslandDropdown", {
+    Title = "Select Island",
+    Values = islandNames,
+    Multi = false,
+    Default = 1,
+    Callback = function(value)
+        selectedIsland = value
+    end
+})
+
+local function tweenToIsland(islandName)
+    local player = game.Players.LocalPlayer
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+
+    local islands = workspace.Worlds["The Overworld"].Islands
+    local destination
+
+    if islandName == "The Void" then
+        destination = islands["The Void"].Island or islands["The Void"]
+    elseif islandName == "Zen" then
+        destination = islands.Zen.Island
+    else
+        destination = islands[islandName] and islands[islandName].Island
+    end
+
+    if destination then
+        local part = destination.PrimaryPart or destination:FindFirstChildWhichIsA("BasePart", true)
+        if part then
+            local goal = {}
+            goal.CFrame = part.CFrame + Vector3.new(0, 5, 0)
+
+            local tween = TweenService:Create(hrp, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), goal)
+            tween:Play()
+
+            Fluent:Notify({
+                Title = "Tweening...",
+                Content = "Moving to " .. islandName,
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Error",
+                Content = "No BasePart found in island.",
+                Duration = 3
+            })
+        end
+    else
+        Fluent:Notify({
+            Title = "Error",
+            Content = "Island not found.",
+            Duration = 3
+        })
+    end
+end
+
+Tabs.Islands:AddButton({
+    Title = "Tween to Island",
+    Description = "Smoothly move to the selected island.",
+    Callback = function()
+        tweenToIsland(selectedIsland)
+    end
+})
 
 -- Mobile UI Toggle
 Tabs.Settings:AddParagraph({
