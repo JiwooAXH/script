@@ -19,6 +19,10 @@ local allowedGames = {
     ["Basketball: Zero (BETA)"] = {
         url = "https://pastes.io/raw/basketball-zero",
         ids = {}
+    },
+    ["Bubble Gum Sim INF"] = {
+        url = "https://pastebin.com/raw/USii7svg",
+        ids = {85896571713843}
     }
 }
 
