@@ -6,7 +6,7 @@ local Window = Fluent:CreateWindow({
     Title = "Bubble Gum Simulator: INF",
     SubTitle = "   Made by: Yuki",
     TabWidth = 160,
-    Size = UDim2.fromOffset(530, 350),
+    Size = UDim2.fromOffset(580, 350),
     Acrylic = true,
     Theme = "Darker",
     MinimizeKey = Enum.KeyCode.LeftControl
@@ -84,12 +84,13 @@ Tabs.Main:AddToggle("AutoCollectToggle", {
 
 -- Auto Bubble Feature
 Tabs.Main:AddParagraph({
-    Title = "Bubble",
+    Title = "Bubble Actions",
     Content = "Automatically Blow or Sell bubble actions using the multi dropdown. You can select one or both."
 })
 
 local bubbleEnabled = false
 local selectedBubbleActions = {}
+local sellBubbleInterval = 0.5 -- Default interval in seconds for selling bubbles
 
 local bubbleDropdown = Tabs.Main:AddDropdown("MultiDropdown", {
     Title = "Bubble Options",
@@ -116,12 +117,39 @@ Tabs.Main:AddToggle("BubbleToggle", {
     end
 })
 
+-- Add the custom sell interval input
+Tabs.Main:AddInput("SellIntervalInput", {
+    Title = "Sell Bubble Interval (seconds)",
+    Default = "0.5",
+    Placeholder = "Enter sell interval...",
+    Numeric = true,
+    Finished = true,
+    Callback = function(value)
+        local num = tonumber(value)
+        if num and num > 0 then
+            sellBubbleInterval = num
+            Fluent:Notify({
+                Title = "Sell Interval Updated",
+                Content = "Bubble sell interval set to " .. num .. " seconds",
+                Duration = 2
+            })
+        else
+            Fluent:Notify({
+                Title = "Invalid Input",
+                Content = "Please enter a positive number",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- Modified bubble action task to use custom timer for SellBubble
 task.spawn(function()
     while true do
-        task.wait(0.5)
+        task.wait() -- Quick response time for bubble blowing
         if bubbleEnabled and #selectedBubbleActions > 0 then
-            for _, action in ipairs(selectedBubbleActions) do
-                local args = { [1] = action }
+            -- Handle blow bubble (always use quick response time)
+            if table.find(selectedBubbleActions, "BlowBubble") then
                 pcall(function()
                     game:GetService("ReplicatedStorage")
                         :WaitForChild("Shared")
@@ -129,9 +157,29 @@ task.spawn(function()
                         :WaitForChild("Network")
                         :WaitForChild("Remote")
                         :WaitForChild("Event")
-                        :FireServer(unpack(args))
+                        :FireServer("BlowBubble")
                 end)
             end
+        end
+    end
+end)
+
+-- Separate task for selling bubbles with custom timer
+task.spawn(function()
+    while true do
+        if bubbleEnabled and table.find(selectedBubbleActions, "SellBubble") then
+            pcall(function()
+                game:GetService("ReplicatedStorage")
+                    :WaitForChild("Shared")
+                    :WaitForChild("Framework")
+                    :WaitForChild("Network")
+                    :WaitForChild("Remote")
+                    :WaitForChild("Event")
+                    :FireServer("SellBubble")
+            end)
+            task.wait(sellBubbleInterval) -- Use custom sell interval
+        else
+            task.wait(0.5) -- Check again after a short delay
         end
     end
 end)
