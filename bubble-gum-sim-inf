@@ -107,9 +107,9 @@ MainCollectSection:AddToggle("AutoCollectToggle", {
 MainCollectSection:AddSlider("CollectionIntervalSlider", {
     Title = "Collection Interval",
     Description = "Higher values = less lag, slower collection",
-    Default = 0.1,
-    Min = 0.05,
-    Max = 0.5,
+    Default = 5,
+    Min = 1,
+    Max = 30,
     Rounding = 2,
     Callback = function(value)
         collectInterval = value
