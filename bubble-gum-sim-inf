@@ -64,7 +64,7 @@ end
 
 -- Improved coin collection with performance optimizations
 local collectCooldown = 0
-local collectInterval = 5 -- Reduced frequency to help with lag
+local collectInterval = 5 -- Default interval in seconds
 
 RunService.Heartbeat:Connect(function()
 	if not autoCollectEnabled then return end
@@ -103,16 +103,29 @@ MainCollectSection:AddToggle("AutoCollectToggle", {
 	end
 })
 
--- Add coin collection performance settings
-MainCollectSection:AddSlider("CollectionIntervalSlider", {
-    Title = "Collection Interval",
-    Description = "Higher values = less lag, slower collection",
-    Default = 5,
-    Min = 1,
-    Max = 30,
-    Rounding = 2,
+-- Change slider to text input for collection interval
+MainCollectSection:AddInput("CollectionIntervalInput", {
+    Title = "Collection Interval (seconds)",
+    Default = "5",
+    Placeholder = "Enter collection interval...",
+    Numeric = true,
+    Finished = true,
     Callback = function(value)
-        collectInterval = value
+        local num = tonumber(value)
+        if num and num > 0 then
+            collectInterval = num
+            Fluent:Notify({
+                Title = "Collection Interval Updated",
+                Content = "Coin collection interval set to " .. num .. " seconds",
+                Duration = 2
+            })
+        else
+            Fluent:Notify({
+                Title = "Invalid Input",
+                Content = "Please enter a positive number",
+                Duration = 2
+            })
+        end
     end
 })
 
