@@ -64,7 +64,7 @@ end
 
 -- Improved coin collection with performance optimizations
 local collectCooldown = 0
-local collectInterval = 0.1 -- Reduced frequency to help with lag
+local collectInterval = 5 -- Reduced frequency to help with lag
 
 RunService.Heartbeat:Connect(function()
 	if not autoCollectEnabled then return end
