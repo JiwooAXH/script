@@ -6,7 +6,7 @@ local TweenService = game:GetService("TweenService")
 
 local Window = Fluent:CreateWindow({
     Title = "Bubble Gum Simulator: INF",
-    SubTitle = " v1.2 • Made by: Yuki",
+    SubTitle = " v1.3 • Made by: Yuki",
     TabWidth = 160,
     Size = UDim2.fromOffset(560, 360),
     Acrylic = true,
@@ -21,8 +21,10 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "︲Settings", Icon = "settings" })
 }
 
--- Main Tab: Auto Collect Coin
-Tabs.Main:AddParagraph({
+-- Main Tab Sections and Features
+local MainCollectSection = Tabs.Main:AddSection("Coin Collection")
+
+MainCollectSection:AddParagraph({
     Title = "Collect Coin",
     Content = "Coin will be automatically collected in range if you turn the toggle on."
 })
@@ -60,25 +62,40 @@ local function getTeleportPart(model)
 	end
 end
 
+-- Improved coin collection with performance optimizations
+local collectCooldown = 0
+local collectInterval = 0.1 -- Reduced frequency to help with lag
+
 RunService.Heartbeat:Connect(function()
 	if not autoCollectEnabled then return end
+	
+	-- Add cooldown to reduce lag
+	if tick() - collectCooldown < collectInterval then return end
+	collectCooldown = tick()
 
 	local char = getCharacter()
 	local root = char:FindFirstChild("HumanoidRootPart")
 	local folder = getTargetFolder()
 	if not root or not folder then return end
 
+	-- Process only a maximum of coins per frame to reduce lag
+	local coinsToProcess = 5 
+	local count = 0
+	
 	for _, model in ipairs(folder:GetChildren()) do
+		if count >= coinsToProcess then break end
+		
 		local part = getTeleportPart(model)
 		if part then
 			model:SetPrimaryPartCFrame(CFrame.new(
 				root.Position + Vector3.new(math.random(-6,6), 0, math.random(-6,6))
 			))
+			count = count + 1
 		end
 	end
 end)
 
-Tabs.Main:AddToggle("AutoCollectToggle", {
+MainCollectSection:AddToggle("AutoCollectToggle", {
 	Title = "Auto Collect Coin",
 	Default = false,
 	Callback = function(value)
@@ -86,8 +103,23 @@ Tabs.Main:AddToggle("AutoCollectToggle", {
 	end
 })
 
--- Main Tab: Auto Bubble Feature
-Tabs.Main:AddParagraph({
+-- Add coin collection performance settings
+MainCollectSection:AddSlider("CollectionIntervalSlider", {
+    Title = "Collection Interval",
+    Description = "Higher values = less lag, slower collection",
+    Default = 0.1,
+    Min = 0.05,
+    Max = 0.5,
+    Rounding = 2,
+    Callback = function(value)
+        collectInterval = value
+    end
+})
+
+-- Bubble Section
+local MainBubbleSection = Tabs.Main:AddSection("Bubble Actions")
+
+MainBubbleSection:AddParagraph({
     Title = "Bubble Actions",
     Content = "Automatically Blow or Sell bubble actions using the multi dropdown. You can select one or both."
 })
@@ -96,7 +128,7 @@ local bubbleEnabled = false
 local selectedBubbleActions = {}
 local sellBubbleInterval = 0.5 -- Default interval in seconds for selling bubbles
 
-local bubbleDropdown = Tabs.Main:AddDropdown("MultiDropdown", {
+local bubbleDropdown = MainBubbleSection:AddDropdown("MultiDropdown", {
     Title = "Bubble Options",
     Description = "Select 'BlowBubble' and/or 'SellBubble'",
     Values = { "BlowBubble", "SellBubble" },
@@ -113,7 +145,7 @@ bubbleDropdown:OnChanged(function(Value)
     end
 end)
 
-Tabs.Main:AddToggle("BubbleToggle", {
+MainBubbleSection:AddToggle("BubbleToggle", {
     Title = "Auto Bubble",
     Default = false,
     Callback = function(value)
@@ -122,7 +154,7 @@ Tabs.Main:AddToggle("BubbleToggle", {
 })
 
 -- Add the custom sell interval input
-Tabs.Main:AddInput("SellIntervalInput", {
+MainBubbleSection:AddInput("SellIntervalInput", {
     Title = "Sell Bubble Interval (seconds)",
     Default = "0.5",
     Placeholder = "Enter sell interval...",
@@ -189,7 +221,9 @@ task.spawn(function()
 end)
 
 -- ISLANDS TAB IMPLEMENTATION
-Tabs.Islands:AddParagraph({
+local IslandsTeleportSection = Tabs.Islands:AddSection("Island Teleportation")
+
+IslandsTeleportSection:AddParagraph({
     Title = "Island TP (Tween)",
     Content = "Choose an island and smoothly tween to it."
 })
@@ -204,7 +238,7 @@ local islandNames = {
 
 local selectedIsland = "Floating Island"
 
-Tabs.Islands:AddDropdown("IslandDropdown", {
+IslandsTeleportSection:AddDropdown("IslandDropdown", {
     Title = "Select Island",
     Values = islandNames,
     Multi = false,
@@ -260,7 +294,7 @@ local function tweenToIsland(islandName)
     end
 end
 
-Tabs.Islands:AddButton({
+IslandsTeleportSection:AddButton({
     Title = "Tween to Island",
     Description = "Smoothly move to the selected island.",
     Callback = function()
@@ -269,27 +303,36 @@ Tabs.Islands:AddButton({
 })
 
 -- CLAIM TAB IMPLEMENTATION
-Tabs.Claim:AddParagraph({
+local ClaimSection = Tabs.Claim:AddSection("Chests & Gifts")
+
+ClaimSection:AddParagraph({
     Title = "Auto Chest & Gift Claimer",
     Content = "Select items to auto-claim below.\n\nNote: To claim a Golden Chest, you must have a Golden Key.\nEach Golden Chest requires one Golden Key.\n\nIf it looks like a chest or gift wasn't claimed, it's likely just a visual bug. The reward is still given."
 })
 
+ClaimSection:AddParagraph({
+    Title = "IMPORTANT: Proximity Requirement",
+    Content = "You must be near the chest/gift for claims to work. Each chest and gift has a proximity detection range. Make sure to teleport to the correct island where the chest/gift is located before trying to claim it."
+})
+
 local autoClaimRunning = false
 local selectedItems = {}
+local claimInterval = 5 -- Default interval in seconds
 
--- Chest & gift definitions
+-- UPDATED: Using the exact remote paths provided by the user and adding wheel spin
 local claimMap = {
     ["Void Chest"] = { "ClaimChest", "Void Chest" },
     ["Golden Chest"] = { "UnlockRiftChest", "golden-chest" },
     ["Giant Chest"] = { "ClaimChest", "Giant Chest" },
     ["Rift Gift"] = { "ClaimRiftGift", "gift-rift" },
+    ["Free Wheel Spin"] = { "ClaimFreeWheelSpin" }
 }
 
--- Dropdown
-local dropdown = Tabs.Claim:AddDropdown("ClaimDropdown", {
-    Title = "Select Chests/Gifts",
-    Description = "Choose which ones to claim.",
-    Values = { "Void Chest", "Golden Chest", "Giant Chest", "Rift Gift" },
+-- Dropdown with added Free Wheel Spin
+local dropdown = ClaimSection:AddDropdown("ClaimDropdown", {
+    Title = "Select Items to Claim",
+    Description = "Choose which ones to auto-claim.",
+    Values = { "Void Chest", "Golden Chest", "Giant Chest", "Rift Gift", "Free Wheel Spin" },
     Multi = true,
     Default = {},
 })
@@ -303,8 +346,8 @@ dropdown:OnChanged(function(val)
     end
 end)
 
--- Toggle
-Tabs.Claim:AddToggle("AutoClaimToggle", {
+-- Toggle for auto claiming
+ClaimSection:AddToggle("AutoClaimToggle", {
     Title = "Enable Auto Claim",
     Default = false,
     Callback = function(state)
@@ -317,6 +360,7 @@ Tabs.Claim:AddToggle("AutoClaimToggle", {
                         if active and claimMap[name] then
                             local args = claimMap[name]
                             pcall(function()
+                                -- Fire server event with correct arguments
                                 game:GetService("ReplicatedStorage")
                                     :WaitForChild("Shared")
                                     :WaitForChild("Framework")
@@ -325,9 +369,10 @@ Tabs.Claim:AddToggle("AutoClaimToggle", {
                                     :WaitForChild("Event")
                                     :FireServer(unpack(args))
                             end)
+                            task.wait(0.5) -- Small delay between different claims
                         end
                     end
-                    task.wait(5) -- Adjust delay if needed
+                    task.wait(claimInterval) -- Wait before next claim cycle
                 end
             end)
         end
@@ -335,7 +380,7 @@ Tabs.Claim:AddToggle("AutoClaimToggle", {
 })
 
 -- Claim interval adjustment
-Tabs.Claim:AddInput("ClaimIntervalInput", {
+ClaimSection:AddInput("ClaimIntervalInput", {
     Title = "Claim Interval (seconds)",
     Default = "5",
     Placeholder = "Enter claim interval...",
@@ -344,6 +389,7 @@ Tabs.Claim:AddInput("ClaimIntervalInput", {
     Callback = function(value)
         local num = tonumber(value)
         if num and num > 0 then
+            claimInterval = num
             Fluent:Notify({
                 Title = "Claim Interval Updated",
                 Content = "Chest/Gift claim interval set to " .. num .. " seconds",
@@ -359,13 +405,39 @@ Tabs.Claim:AddInput("ClaimIntervalInput", {
     end
 })
 
+-- For users who want to claim wheel spin separately
+local WheelSpinSection = Tabs.Claim:AddSection("Free Wheel Spin")
+
+WheelSpinSection:AddButton({
+    Title = "Claim Free Wheel Spin Now",
+    Description = "Instantly claim a free wheel spin (one-time)",
+    Callback = function()
+        local args = {"ClaimFreeWheelSpin"}
+        game:GetService("ReplicatedStorage")
+            :WaitForChild("Shared")
+            :WaitForChild("Framework")
+            :WaitForChild("Network")
+            :WaitForChild("Remote")
+            :WaitForChild("Event")
+            :FireServer(unpack(args))
+        
+        Fluent:Notify({
+            Title = "Wheel Spin",
+            Content = "Attempted to claim free wheel spin",
+            Duration = 2
+        })
+    end
+})
+
 -- Mobile UI Toggle
-Tabs.Settings:AddParagraph({
+local MobileSection = Tabs.Settings:AddSection("Mobile Settings")
+
+MobileSection:AddParagraph({
     Title = "Mobile UI Toggle",
     Content = "For mobile users: Click the button below to add a toggle button that lets you hide/show the GUI."
 })
 
-Tabs.Settings:AddButton({
+MobileSection:AddButton({
     Title = "Load Mobile Toggle Button",
     Description = "Creates a small button to hide/show the GUI",
     Callback = function()
@@ -379,6 +451,8 @@ Tabs.Settings:AddButton({
 })
 
 -- SaveManager Setup
+local SaveSection = Tabs.Settings:AddSection("Config Management")
+
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
