@@ -23,6 +23,10 @@ local allowedGames = {
     ["Bubble Gum Simulator: INFINITE"] = {
         url = "https://pastes.io/raw/bubble-gum-sim-inf",
         ids = {85896571713843}
+    },
+    ["Anime Ranger X"] = {
+        url = "https://pastes.io/raw/anime-ranger-x",
+        ids = {}
     }
 }
 
