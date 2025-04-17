@@ -1,0 +1,437 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- Create a window
+local Window = Fluent:CreateWindow({
+    Title = "Anime Ranger X",
+    SubTitle = "Made by: Yuki",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(530, 350),
+    Acrylic = true,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+-- Create tabs
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Upgrade = Window:AddTab({ Title = "Upgrade", Icon = "trending-up" }),
+    AutoClicker = Window:AddTab({ Title = "Auto Clicker", Icon = "mouse-pointer-click" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Main Tab
+local MainSection = Tabs.Main:AddSection("Auto Voting")
+
+Tabs.Main:AddParagraph({
+    Title = "Auto Voting",
+    Content = "Select options and toggle to start."
+})
+
+-- Create remote options and their corresponding functions (with updated names)
+local remoteOptions = {
+    Retry = function()
+        while true do
+            game:GetService("ReplicatedStorage"):WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("OnGame"):WaitForChild("Voting"):WaitForChild("VoteRetry"):FireServer()
+            wait()
+        end
+    end,
+    Vote = function()
+        game:GetService("ReplicatedStorage"):WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("OnGame"):WaitForChild("Voting"):WaitForChild("VotePlaying"):FireServer()
+    end,
+    Next = function()
+        game:GetService("ReplicatedStorage"):WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("OnGame"):WaitForChild("Voting"):WaitForChild("VoteNext"):FireServer()
+    end
+}
+
+-- Store selected options and active coroutines
+local selectedOptions = {}
+local activeCoroutines = {}
+
+-- Add multi dropdown for selecting voting options (with updated names)
+Tabs.Main:AddDropdown("VotingOptions", {
+    Title = "Select Voting Options",
+    Values = {"Retry", "Vote", "Next"},
+    Multi = true,
+    Default = {},
+    Callback = function(Value)
+        selectedOptions = Value
+    end
+})
+
+-- Function to start/stop the voting process
+local function toggleVoting(state)
+    -- Clear any existing coroutines
+    for _, co in pairs(activeCoroutines) do
+        coroutine.close(co)
+    end
+    activeCoroutines = {}
+    
+    if state then
+        -- Start new coroutines for each selected option
+        for option, _ in pairs(selectedOptions) do
+            if remoteOptions[option] then
+                local co = coroutine.create(function()
+                    if option == "Retry" then
+                        remoteOptions[option]() -- This has an infinite loop
+                    else
+                        while true do
+                            remoteOptions[option]() -- Other options need a loop
+                            wait(1) -- Wait between calls
+                        end
+                    end
+                end)
+                activeCoroutines[option] = co
+                coroutine.resume(co)
+            end
+        end
+        
+        Fluent:Notify({
+            Title = "Auto Voting Started",
+            Content = "The selected voting options are now running automatically.",
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Auto Voting Stopped",
+            Content = "All automatic voting has been stopped.",
+            Duration = 3
+        })
+    end
+end
+
+-- Add toggle for enabling/disabling the voting system
+Tabs.Main:AddToggle("EnableVoting", {
+    Title = "Enable Auto Voting",
+    Default = false,
+    Callback = function(Value)
+        toggleVoting(Value)
+    end
+})
+
+-- UPGRADE SECTION
+local UpgradeSection = Tabs.Upgrade:AddSection("Unit Upgrading")
+
+Tabs.Upgrade:AddParagraph({
+    Title = "Auto Upgrade",
+    Content = "Select units and toggle to start automatic upgrades."
+})
+
+-- Auto upgrade state
+local autoUpgrade = false
+local selectedUnits = {}
+local upgradeInterval = 0.5 -- default upgrade interval in seconds
+local notificationUIConnection = nil
+
+-- Function to hide Notification UI
+local function hideNotificationUI()
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local notificationUI = playerGui:FindFirstChild("Notification")
+
+    if notificationUI and notificationUI:IsA("ScreenGui") then
+        notificationUI.Enabled = false
+    end
+end
+
+-- Add text input for upgrade interval
+Tabs.Upgrade:AddInput("UpgradeInterval", {
+    Title = "Upgrade Interval (seconds)",
+    Default = "0.5",
+    Placeholder = "Enter interval (e.g. 0.5)",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        -- Convert input string to number
+        local numberValue = tonumber(Value)
+        -- Validate input is a positive number
+        if numberValue and numberValue > 0 then
+            upgradeInterval = numberValue
+            Fluent:Notify({
+                Title = "Upgrade Interval Changed",
+                Content = "Set to " .. tostring(upgradeInterval) .. " seconds",
+                Duration = 2
+            })
+        else
+            Fluent:Notify({
+                Title = "Invalid Input",
+                Content = "Please enter a positive number",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- Multi-dropdown for selecting units
+local MultiDropdown = Tabs.Upgrade:AddDropdown("UnitSelection", {
+    Title = "Select Units to Auto Upgrade",
+    Description = "You can select multiple units.",
+    Values = {},
+    Multi = true,
+    Default = {},
+})
+
+-- Handle dropdown value changes
+MultiDropdown:OnChanged(function(Value)
+    selectedUnits = {}
+    for unitName, isSelected in next, Value do
+        if isSelected then
+            table.insert(selectedUnits, unitName)
+        end
+    end
+    print("Units selected for upgrade:", table.concat(selectedUnits, ", "))
+end)
+
+-- Update dropdown values in real-time
+task.spawn(function()
+    while true do
+        task.wait(2)
+        local unitFolder = LocalPlayer:FindFirstChild("UnitsFolder")
+        if unitFolder then
+            local unitNames = {}
+            for _, unit in ipairs(unitFolder:GetChildren()) do
+                if unit:IsA("Model") or unit:IsA("Folder") then
+                    table.insert(unitNames, unit.Name)
+                end
+            end
+            MultiDropdown:SetValues(unitNames)
+        end
+    end
+end)
+
+-- Toggle for auto upgrade
+Tabs.Upgrade:AddToggle("AutoUpgradeToggle", {
+    Title = "Auto Upgrade",
+    Default = false,
+    Callback = function(state)
+        autoUpgrade = state
+        
+        if state then
+            -- Initial hide of notification UI
+            hideNotificationUI()
+            
+            -- Connection to keep Notification UI hidden
+            if notificationUIConnection then
+                notificationUIConnection:Disconnect()
+            end
+            
+            notificationUIConnection = RunService.RenderStepped:Connect(function()
+                local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+                if playerGui then
+                    local notificationUI = playerGui:FindFirstChild("Notification")
+                    if notificationUI and notificationUI.Enabled then
+                        notificationUI.Enabled = false
+                    end
+                end
+            end)
+            
+            Fluent:Notify({
+                Title = "Auto Upgrade Enabled",
+                Content = "Your selected units will be upgraded automatically.",
+                Duration = 3
+            })
+        else
+            -- Disconnect notification UI hiding when disabled
+            if notificationUIConnection then
+                notificationUIConnection:Disconnect()
+                notificationUIConnection = nil
+            end
+            
+            Fluent:Notify({
+                Title = "Auto Upgrade Disabled",
+                Content = "Auto upgrading has been stopped.",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- Auto-upgrade loop
+local lastUpgradeTime = 0
+RunService.RenderStepped:Connect(function()
+    if autoUpgrade then
+        local currentTime = tick()
+        if currentTime - lastUpgradeTime >= upgradeInterval then
+            lastUpgradeTime = currentTime
+            
+            for _, unitName in ipairs(selectedUnits) do
+                local unitFolder = LocalPlayer:FindFirstChild("UnitsFolder")
+                if unitFolder then
+                    local unit = unitFolder:FindFirstChild(unitName)
+                    if unit then
+                        local args = { unit }
+                        ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Server"):WaitForChild("Units"):WaitForChild("Upgrade"):FireServer(unpack(args))
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO CLICKER SECTION
+local ClickerSection = Tabs.AutoClicker:AddSection("Auto Clicker")
+
+Tabs.AutoClicker:AddParagraph({
+    Title = "Auto Claimer",
+    Content = "Auto clicks and hides reward popups."
+})
+
+-- Auto Clicker variables
+local autoClickerEnabled = false
+local clickInterval = 0.1 -- seconds between clicks
+local autoClickerThread = nil
+
+-- Add text input for click interval
+Tabs.AutoClicker:AddInput("ClickInterval", {
+    Title = "Click Interval (seconds)",
+    Default = "0.1",
+    Placeholder = "Enter interval (e.g. 0.1)",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        -- Convert input string to number
+        local numberValue = tonumber(Value)
+        -- Validate input is a positive number
+        if numberValue and numberValue > 0 then
+            clickInterval = numberValue
+            Fluent:Notify({
+                Title = "Click Interval Changed",
+                Content = "Set to " .. tostring(clickInterval) .. " seconds",
+                Duration = 2
+            })
+        else
+            Fluent:Notify({
+                Title = "Invalid Input",
+                Content = "Please enter a positive number",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- Function to hide RewardsUI
+local function hideRewardsUI()
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local rewardsUI = playerGui:FindFirstChild("RewardsUI")
+    
+    if rewardsUI and rewardsUI:IsA("ScreenGui") then
+        rewardsUI.Enabled = false
+    end
+end
+
+-- Function to start/stop auto clicker
+local function toggleAutoClicker(state)
+    autoClickerEnabled = state
+    
+    if state then
+        -- Initial hide
+        hideRewardsUI()
+        
+        -- Connection to keep RewardsUI hidden
+        local renderStepConnection = RunService.RenderStepped:Connect(function()
+            local rewardsUI = Players.LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("RewardsUI")
+            if rewardsUI and rewardsUI.Enabled then
+                rewardsUI.Enabled = false
+            end
+        end)
+        
+        -- Start auto clicker thread
+        autoClickerThread = task.spawn(function()
+            while autoClickerEnabled do
+                task.wait(clickInterval)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            end
+            renderStepConnection:Disconnect()
+        end)
+        
+        Fluent:Notify({
+            Title = "Auto Clicker Enabled",
+            Content = "Auto clicking and reward hiding are now active.",
+            Duration = 3
+        })
+    else
+        -- Stop the auto clicker thread if it exists
+        if autoClickerThread then
+            task.cancel(autoClickerThread)
+            autoClickerThread = nil
+        end
+        
+        Fluent:Notify({
+            Title = "Auto Clicker Disabled",
+            Content = "Auto clicking and reward hiding have been stopped.",
+            Duration = 3
+        })
+    end
+end
+
+-- Add toggle for enabling/disabling auto clicker
+Tabs.AutoClicker:AddToggle("EnableAutoClicker", {
+    Title = "Enable Auto Clicker",
+    Default = false,
+    Callback = function(Value)
+        toggleAutoClicker(Value)
+    end
+})
+
+-- Settings Section
+local SettingsSection = Tabs.Settings:AddSection("Mobile Settings")
+
+Tabs.Settings:AddParagraph({
+    Title = "Mobile UI",
+    Content = "Add toggle button for mobile users."
+})
+
+-- Button to load mobile toggle GUI
+Tabs.Settings:AddButton({
+    Title = "Load Mobile Toggle Button",
+    Description = "Creates a small button to hide/show the GUI",
+    Callback = function()
+        -- Load the mobile toggle UI
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JiwooAXH/script/main/Toggle-GUi", true))()
+        
+        Fluent:Notify({
+            Title = "Mobile Toggle Loaded",
+            Content = "You can now use the toggle button to hide/show the GUI",
+            Duration = 5
+        })
+    end
+})
+
+-- Config Section
+local ConfigSection = Tabs.Settings:AddSection("Configuration")
+
+-- Set up SaveManager with proper configuration
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+
+-- Set folders for saved configurations
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/anime-ranger-x-config")
+
+-- Build settings UI
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+-- Select the first tab by default
+Window:SelectTab(1)
+
+-- Show a notification that the script has loaded
+Fluent:Notify({
+    Title = "Anime Ranger X Script Loaded",
+    Content = "Auto voting, upgrading, and clicking features are ready to use.",
+    Duration = 3
+})
+
+-- Load saved configuration
+SaveManager:LoadAutoloadConfig()
