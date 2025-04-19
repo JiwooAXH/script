@@ -13,7 +13,7 @@ local allowedGames = {
         ids = {}
     },
     ["Blair"] = {
-        url = "https://pastes.io/raw/iiblair-43",
+        url = "https://pastefy.app/69Dfd9M1/raw",
         ids = {}
     },
     ["Basketball: Zero (BETA)"] = {
