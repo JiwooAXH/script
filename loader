@@ -5,7 +5,7 @@ local allowedGames = {
         ids = {72992062125248}
     },
     ["Blue Lock: Rivals"] = {
-        url = "https://pastes.io/raw/bl-rivals",
+        url = "https://pastefy.app/4l9QS3WQ/raw",
         ids = {18668065416}
     },
     ["Volleyball Legends"] = {
