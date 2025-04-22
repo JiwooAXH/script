@@ -9,7 +9,7 @@ local allowedGames = {
         ids = {18668065416}
     },
     ["Volleyball Legends"] = {
-        url = "https://pastes.io/raw/v-ball-763",
+        url = "https://pastefy.app/CPg7BawS/raw",
         ids = {}
     },
     ["Blair"] = {
