@@ -3,30 +3,94 @@ local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
+--// Create Window
 local Window = Fluent:CreateWindow({
-    Title = "Volleyball Legends",
+    Title = "SNLunaris Volleyball",
     SubTitle = "Made by: Yuki",
     TabWidth = 160,
-    Size = UDim2.fromOffset(520, 330),
+    Size = UDim2.fromOffset(530, 350),
     Acrylic = true,
     Theme = "Darker",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
+--// Create Tabs
 local Tabs = {
     Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    LineOfSight = Window:AddTab({ Title = "Line of Sight", Icon = "eye" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
 local Options = Fluent.Options
 
---// Variables
+--// BALL HITBOX VARIABLES
 local scaleFactor = 3
 local originalSizes = {}
 local showHitbox = false
 local hitboxEnabled = false
 
---// Functions
+-- Variables for Air Rotation system
+local rotationEnabled = false
+local rotationConnection
+local player, char, hum, root, cam, runService = game.Players.LocalPlayer
+char = player.Character or player.CharacterAdded:Wait()
+hum, root = char:WaitForChild("Humanoid"), char:WaitForChild("HumanoidRootPart")
+cam, runService = workspace.CurrentCamera, game:GetService("RunService")
+local rotating = false
+
+local function setupRotation()
+    if rotationConnection then rotationConnection:Disconnect() end
+
+    rotationConnection = runService.RenderStepped:Connect(function()
+        if rotationEnabled and rotating and root and root.Parent then
+            local dir = cam.CFrame.LookVector
+            root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, math.atan2(-dir.X, -dir.Z), 0)
+        end
+    end)
+
+    hum.StateChanged:Connect(function(_, state)
+        rotating = (state == Enum.HumanoidStateType.Freefall)
+    end)
+
+    player.CharacterAdded:Connect(function(newChar)
+        char = newChar
+        hum, root = char:WaitForChild("Humanoid"), char:WaitForChild("HumanoidRootPart")
+        setupRotation()
+    end)
+end
+
+setupRotation()
+
+--// SETTINGS FOR LINE VISUALIZATION
+-- 6 distinct colors for player lines
+local colorPalette = {
+    Color3.fromRGB(255, 50, 50),   -- Red
+    Color3.fromRGB(50, 255, 50),   -- Green
+    Color3.fromRGB(50, 50, 255),   -- Blue
+    Color3.fromRGB(255, 255, 50),  -- Yellow
+    Color3.fromRGB(255, 50, 255),  -- Magenta
+    Color3.fromRGB(50, 255, 255)   -- Cyan
+}
+local colorIndex = 1
+local playerColors = {}  -- Store assigned colors per player
+
+local lineTransparency = 0.3
+local lineThickness = 0.2
+local lineRange = 130
+local floorOffset = 0.1
+local visualizationEnabled = false
+local exemptedPlayers = {}
+
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local localPlayer = Players.LocalPlayer
+
+--// Store line parts per player
+local playerLines = {}
+
+--// HITBOX FUNCTIONS
 local function createSphereHitbox(position, size, anchored, parent)
     local hitbox = Instance.new("Part")
     hitbox.Name = "VisualHitbox"
@@ -75,13 +139,227 @@ local function updateHitboxDisplay()
     end
 end
 
---// UI Elements
-Tabs.Main:AddParagraph({
-    Title = "Ball Hitbox",
-    Content = "Manage ball hitbox visibility and size."
-})
+--// LINE OF SIGHT FUNCTIONS
+-- Function to check if an object is a CLIENT_BALL
+local function isClientBall(instance)
+    if instance and instance.Name and typeof(instance.Name) == "string" then
+        return string.match(instance.Name, "^CLIENT_BALL_%d+$") ~= nil
+    end
+    return false
+end
 
-Tabs.Main:AddToggle("EnableHitbox", {
+-- Function to get all CLIENT_BALL objects in the workspace
+local function getAllClientBalls()
+    local clientBalls = {}
+    for _, child in pairs(Workspace:GetChildren()) do
+        if isClientBall(child) then
+            table.insert(clientBalls, child)
+        end
+    end
+    return clientBalls
+end
+
+-- Function to get the next color for a player
+local function getPlayerColor(player)
+    if playerColors[player] then
+        return playerColors[player]
+    else
+        -- Assign next color in the palette
+        local color = colorPalette[colorIndex]
+        playerColors[player] = color
+        
+        -- Move to next color or cycle back
+        colorIndex = colorIndex % #colorPalette + 1
+        
+        return color
+    end
+end
+
+-- Raycasting function to find floor position
+local function getFloorPosition(position)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    -- Create a table of objects to exclude from raycast
+    local filterInstances = {}
+    
+    -- Add all line parts to filter
+    for _, playerLineArray in pairs(playerLines) do
+        for _, line in pairs(playerLineArray) do
+            table.insert(filterInstances, line)
+        end
+    end
+    
+    -- Add all player characters to filter list
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Character then
+            table.insert(filterInstances, player.Character)
+        end
+    end
+    
+    -- Add all CLIENT_BALL objects to filter
+    local clientBalls = getAllClientBalls()
+    for _, ball in ipairs(clientBalls) do
+        table.insert(filterInstances, ball)
+    end
+    
+    rayParams.FilterDescendantsInstances = filterInstances
+    
+    local rayOrigin = position + Vector3.new(0, 50, 0)  -- Start high above the position
+    local rayDirection = Vector3.new(0, -100, 0)  -- Ray downward with longer distance
+    
+    local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+    
+    if rayResult and rayResult.Position then
+        -- Check if we hit a CLIENT_BALL despite the filter (just in case)
+        if rayResult.Instance and isClientBall(rayResult.Instance) then
+            -- Log detected ball just for debugging
+            print("CLIENT_BALL was detected and ignored: " .. rayResult.Instance.Name)
+            
+            -- If we hit a CLIENT_BALL, continue looking for the actual floor
+            local newRayOrigin = rayResult.Position - Vector3.new(0, 1, 0)  -- Start slightly below the ball
+            local newRayResult = Workspace:Raycast(newRayOrigin, rayDirection, rayParams)
+            
+            if newRayResult and newRayResult.Position then
+                return newRayResult.Position + Vector3.new(0, floorOffset, 0)
+            end
+        else
+            return rayResult.Position + Vector3.new(0, floorOffset, 0)  -- Return position with offset
+        end
+    end
+    
+    -- If no floor found, use a fixed Y coordinate as fallback
+    local baseY = Workspace.FallenPartsDestroyHeight + 5
+    return Vector3.new(position.X, baseY, position.Z)
+end
+
+-- Function to create or update a line part
+local function updateLineForPlayer(player)
+    if player == localPlayer then return end  -- Skip your own character
+    if exemptedPlayers[player.Name] then return end  -- Skip exempted players
+    
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local rootPart = char.HumanoidRootPart
+    local rootPos = rootPart.Position
+    local direction = rootPart.CFrame.LookVector
+    local flatDirection = Vector3.new(direction.X, 0, direction.Z).Unit
+    
+    -- Get the floor position at player's feet
+    local floorStartPos = getFloorPosition(rootPos)
+    
+    -- Calculate endpoint by extending in the facing direction but keeping flat
+    local endPointBeforeRaycast = Vector3.new(
+        rootPos.X + flatDirection.X * lineRange,
+        rootPos.Y,  -- Same Y as start (before raycast)
+        rootPos.Z + flatDirection.Z * lineRange
+    )
+    
+    -- Get the floor position at the endpoint
+    local floorEndPos = getFloorPosition(endPointBeforeRaycast)
+    
+    -- Ensure both points have exactly the same Y value to keep line flat
+    -- Using the lower of the two Y values to ensure line stays on floor
+    local lineY = math.min(floorStartPos.Y, floorEndPos.Y)
+    
+    local startPos = Vector3.new(floorStartPos.X, lineY, floorStartPos.Z)
+    local endPos = Vector3.new(floorEndPos.X, lineY, floorEndPos.Z)
+    
+    -- Calculate the midpoint and length for the line part
+    local midPoint = (startPos + endPos) / 2
+    local lineLength = (endPos - startPos).Magnitude
+    
+    -- Create or reuse line
+    if not playerLines[player] then
+        playerLines[player] = {}
+    end
+    
+    local line = playerLines[player][1]
+    if not line then
+        line = Instance.new("Part")
+        line.Anchored = true
+        line.CanCollide = false
+        line.Material = Enum.Material.Neon
+        line.Color = getPlayerColor(player)
+        line.Transparency = lineTransparency
+        line.CastShadow = false
+        line.Name = player.Name .. "_LOS"
+        
+        -- Make the line always visible
+        local billboard = Instance.new("BillboardGui")
+        billboard.AlwaysOnTop = true
+        billboard.Size = UDim2.new(0, 0, 0, 0)  -- Zero size to be invisible but make parent always render
+        billboard.Adornee = line
+        billboard.Parent = line
+        
+        line.Parent = workspace
+        playerLines[player][1] = line
+    end
+    
+    -- Update line size and position to make sure it's flat on the floor
+    line.Size = Vector3.new(lineLength, lineThickness, lineThickness)
+    
+    -- Create a CFrame that points from start to end, but stays flat
+    local direction = (endPos - startPos).Unit
+    line.CFrame = CFrame.new(midPoint, midPoint + Vector3.new(direction.X, 0, direction.Z)) 
+                * CFrame.Angles(0, math.rad(90), 0)
+end
+
+-- Function to cleanup visualization
+local function cleanupPlayerLines()
+    for player, lines in pairs(playerLines) do
+        for _, line in pairs(lines) do
+            line:Destroy()
+        end
+    end
+    playerLines = {}
+end
+
+-- Function to toggle visualization
+local function toggleVisualization(enabled)
+    visualizationEnabled = enabled
+    
+    if not enabled then
+        cleanupPlayerLines()
+    end
+end
+
+-- Function to update exemption list
+local function updateExemptedPlayers(dropdownValues)
+    exemptedPlayers = {}
+    for playerName, isExempt in pairs(dropdownValues) do
+        if isExempt then
+            exemptedPlayers[playerName] = true
+            
+            -- Remove lines for newly exempted players
+            local playerObj = Players:FindFirstChild(playerName)
+            if playerObj and playerLines[playerObj] then
+                for _, line in pairs(playerLines[playerObj]) do
+                    line:Destroy()
+                end
+                playerLines[playerObj] = nil
+            end
+        end
+    end
+end
+
+-- Function to get all player names for dropdown
+local function getPlayerValues()
+    local playerNames = {}
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            table.insert(playerNames, player.Name)
+        end
+    end
+    return playerNames
+end
+
+--// MAIN TAB SECTIONS
+-- Ball Hitbox Section
+local BallHitboxSection = Tabs.Main:AddSection("Enhanced Ball Hitbox")
+
+BallHitboxSection:AddToggle("EnableHitbox", {
     Title = "Enable Hitbox",
     Default = false
 }):OnChanged(function(value)
@@ -101,7 +379,7 @@ Tabs.Main:AddToggle("EnableHitbox", {
     end
 end)
 
-Tabs.Main:AddToggle("ShowHitbox", {
+BallHitboxSection:AddToggle("ShowHitbox", {
     Title = "Show Hitbox",
     Default = false
 }):OnChanged(function(value)
@@ -109,7 +387,7 @@ Tabs.Main:AddToggle("ShowHitbox", {
     updateHitboxDisplay()
 end)
 
-Tabs.Main:AddInput("HitboxSize", {
+BallHitboxSection:AddInput("HitboxSize", {
     Title = "Hitbox Size",
     Default = "3",
     Placeholder = "Enter size (e.g., 3)",
@@ -133,30 +411,269 @@ Tabs.Main:AddInput("HitboxSize", {
     end
 end)
 
--- Listen for new CLIENT_BALL models
-local connection = workspace.ChildAdded:Connect(function(child)
+-- Air Rotation Section
+local AirRotationSection = Tabs.Main:AddSection("Camera-Based Air Rotation")
+
+AirRotationSection:AddToggle("AirRotationToggle", {
+    Title = "Air Rotation",
+    Default = false,
+    Callback = function(state)
+        rotationEnabled = state
+    end
+})
+
+--// LINE OF SIGHT TAB SECTIONS
+-- Main LOS Controls Section
+local LOSControlSection = Tabs.LineOfSight:AddSection("Line of Sight Controls")
+
+LOSControlSection:AddToggle("ToggleVisualization", {
+    Title = "Enable Line Visualization",
+    Default = false,
+    Callback = function(Value)
+        toggleVisualization(Value)
+    end
+})
+
+-- Line Settings Section
+local LOSSettingsSection = Tabs.LineOfSight:AddSection("Line Appearance Settings")
+
+LOSSettingsSection:AddInput("LineRangeInput", {
+    Title = "Line Range",
+    Default = tostring(lineRange),
+    Placeholder = "Enter line range (10-300)",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 10 and num <= 300 then
+            lineRange = num
+        end
+    end
+})
+
+LOSSettingsSection:AddInput("LineThicknessInput", {
+    Title = "Line Thickness",
+    Default = tostring(lineThickness),
+    Placeholder = "Enter thickness (0.1-1)",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 0.1 and num <= 1 then
+            lineThickness = num
+        end
+    end
+})
+
+-- Player Exclusion Section
+local PlayerExclusionSection = Tabs.LineOfSight:AddSection("Player Line Filtering")
+
+-- Add multi-dropdown for player exemption
+local PlayerDropdown = PlayerExclusionSection:AddDropdown("ExemptPlayers", {
+    Title = "Exempt Players",
+    Description = "Select players to exempt from line visualization",
+    Values = getPlayerValues(),
+    Multi = true,
+    Default = {}
+})
+
+PlayerDropdown:OnChanged(function(Value)
+    updateExemptedPlayers(Value)
+end)
+
+-- Button to refresh player list
+PlayerExclusionSection:AddButton({
+    Title = "Refresh Player List",
+    Description = "Update the player dropdown with current players",
+    Callback = function()
+        PlayerDropdown:SetValues(getPlayerValues())
+        
+        Fluent:Notify({
+            Title = "Player List Updated",
+            Content = "Player dropdown has been refreshed",
+            Duration = 3
+        })
+    end
+})
+
+-- Debug Tools Section
+local DebugSection = Tabs.LineOfSight:AddSection("Debug Tools")
+
+DebugSection:AddButton({
+    Title = "Check for Balls",
+    Description = "Print all CLIENT_BALL objects found in workspace",
+    Callback = function()
+        local clientBalls = getAllClientBalls()
+        local ballCount = #clientBalls
+        
+        local ballNames = ""
+        for i, ball in ipairs(clientBalls) do
+            if i <= 3 then  -- Only show first 3 balls in notification
+                ballNames = ballNames .. ball.Name .. "\n"
+            end
+        end
+        
+        if ballCount > 3 then
+            ballNames = ballNames .. "... and " .. (ballCount - 3) .. " more"
+        end
+        
+        Fluent:Notify({
+            Title = ballCount .. " CLIENT_BALL objects found",
+            Content = ballNames,
+            Duration = 5
+        })
+        
+        -- Also print to console for debugging
+        print("Found " .. ballCount .. " CLIENT_BALL objects:")
+        for _, ball in ipairs(clientBalls) do
+            print("- " .. ball.Name)
+        end
+    end
+})
+
+--// SETTINGS TAB SECTIONS
+-- Mobile UI Section
+local MobileUISection = Tabs.Settings:AddSection("Mobile UI Options")
+
+MobileUISection:AddButton({
+    Title = "Load Mobile Toggle Button",
+    Description = "Creates a small button to hide/show the GUI",
+    Callback = function()
+        -- Load the mobile toggle UI
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JiwooAXH/script/main/Toggle-GUi", true))()
+        
+        Fluent:Notify({
+            Title = "Mobile Toggle Loaded",
+            Content = "You can now use the toggle button to hide/show the GUI",
+            Duration = 5
+        })
+    end
+})
+
+--// Create an optimization variable to avoid recreating lines every frame
+local lastUpdate = {}
+
+--// EVENT CONNECTIONS
+
+-- Set up a listener for new objects added to workspace 
+Workspace.ChildAdded:Connect(function(child)
+    if isClientBall(child) then
+        print("New CLIENT_BALL detected: " .. child.Name)
+        
+        -- Add hitbox if enabled
+        if hitboxEnabled and child:IsA("Model") and child.Name:match("^CLIENT_BALL_%d+$") then
+            resizeModel(child)
+        end
+    end
+end)
+
+-- Listen for balls for hitbox feature
+local ballConnection = workspace.ChildAdded:Connect(function(child)
     if hitboxEnabled and child:IsA("Model") and child.Name:match("^CLIENT_BALL_%d+$") then
         resizeModel(child)
     end
 end)
 
-_G.CLIENT_BALL_SCRIPT = connection
+_G.CLIENT_BALL_SCRIPT = ballConnection
 
--- Notifications
-Fluent:Notify({
-    Title = "Volleyball Legends",
-    Content = "Script is Executed",
-    Duration = 3
-})
+-- Render loop for line of sight
+RunService.RenderStepped:Connect(function()
+    if not visualizationEnabled then return end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        pcall(function()
+            -- Only update line if player has moved or a certain time has passed
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local rootPart = char.HumanoidRootPart
+                local currentPos = rootPart.Position
+                local currentLook = rootPart.CFrame.LookVector
+                
+                -- Create entry if doesn't exist
+                if not lastUpdate[player] then
+                    lastUpdate[player] = {
+                        position = Vector3.new(0,0,0), 
+                        lookVector = Vector3.new(0,0,0),
+                        updateTime = 0
+                    }
+                end
+                
+                -- Check if position or orientation changed significantly or if it's time for an update
+                local posDiff = (currentPos - lastUpdate[player].position).Magnitude
+                local dirDiff = (currentLook - lastUpdate[player].lookVector).Magnitude
+                local timeDiff = tick() - lastUpdate[player].updateTime
+                
+                if posDiff > 0.5 or dirDiff > 0.1 or timeDiff > 0.5 then
+                    updateLineForPlayer(player)
+                    
+                    -- Update the last known values
+                    lastUpdate[player].position = currentPos
+                    lastUpdate[player].lookVector = currentLook
+                    lastUpdate[player].updateTime = tick()
+                end
+            end
+        end)
+    end
+end)
 
--- Settings Management
+-- Handle player joining
+Players.PlayerAdded:Connect(function(player)
+    -- Update dropdown values when a new player joins
+    PlayerDropdown:SetValues(getPlayerValues())
+    
+    player.CharacterAdded:Connect(function()
+        if visualizationEnabled and not exemptedPlayers[player.Name] then
+            task.wait(1)
+            updateLineForPlayer(player)
+        end
+    end)
+end)
+
+-- Handle player leaving
+Players.PlayerRemoving:Connect(function(player)
+    -- Clean up lines for player
+    if playerLines[player] then
+        for _, line in pairs(playerLines[player]) do
+            line:Destroy()
+        end
+        playerLines[player] = nil
+    end
+    
+    -- Clean up last update data
+    lastUpdate[player] = nil
+    
+    -- Release the player's color assignment
+    playerColors[player] = nil
+    
+    -- Update dropdown values when a player leaves
+    PlayerDropdown:SetValues(getPlayerValues())
+end)
+
+--// FINAL SETUP
+
+-- Set up SaveManager with proper configuration
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({})
-InterfaceManager:SetFolder("FluentScriptHub")
-SaveManager:SetFolder("FluentScriptHub/VolleyballLegends")
+
+-- Set folders for saved configurations
+InterfaceManager:SetFolder("SNLunaris")
+SaveManager:SetFolder("SNLunaris/config")
+
+-- Build settings UI
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 SaveManager:BuildConfigSection(Tabs.Settings)
+
+-- Select the first tab by default
 Window:SelectTab(1)
+
+-- Show a notification that the script has loaded
+Fluent:Notify({
+    Title = "SNLunaris Loaded",
+    Content = "Volleyball script loaded with enhanced features",
+    Duration = 3
+})
+
+-- Load saved configuration
 SaveManager:LoadAutoloadConfig()
