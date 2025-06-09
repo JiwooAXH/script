@@ -29,7 +29,7 @@ local allowedGames = {
         ids = {}
     },
     ["Grow a Garden"] = {
-        url = ""https://lunor.dev/loader"
+        url = "https://lunor.dev/loader"
         ids = {}
     }
 }
