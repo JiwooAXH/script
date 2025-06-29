@@ -31,6 +31,10 @@ local allowedGames = {
     ["Grow a Garden"] = {
         url = "https://lunor.dev/loader",
         ids = {}
+    },
+    ["Dig"] = {
+        url = "loadstring(game:HttpGet("https://raw.githubusercontent.com/3x3x3x3x3/rt/refs/heads/main/Protected_4660484644500636.lua"))()",
+        ids = {}
     }
 }
 
