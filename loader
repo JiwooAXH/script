@@ -1,5 +1,5 @@
 -- Enhanced Game Loader UI with dark mode, search, drag, and animations
-local allowedGames = {.
+local allowedGames = {
     ["Hunters"] = {
         url = "https://raw.githubusercontent.com/JiwooAXH/hunters/main/loader",
         ids = {72992062125248}
