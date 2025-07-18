@@ -1,0 +1,610 @@
+-- CLEANUP
+local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+local existing = playerGui and playerGui:FindFirstChild("AutoUpgrader")
+if existing then existing:Destroy() end
+local existingToggle = playerGui and playerGui:FindFirstChild("ToggleButton")
+if existingToggle then existingToggle:Destroy() end
+
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Remote Functions
+local RemoteFunctions = ReplicatedStorage:WaitForChild("RemoteFunctions")
+local UpgradeUnit = RemoteFunctions:WaitForChild("UpgradeUnit")
+local PlaceUnit = RemoteFunctions:WaitForChild("PlaceUnit")
+local SellUnit = RemoteFunctions:WaitForChild("SellUnit")
+
+-- State (Updated with Beaks.txt placement system)
+local state = {
+    isAutoUpgrading = false,
+    selectedUnits = {},
+    upgradeAll = false,
+    visualBoxes = {},
+    recordedUnits = {}, -- Now stores by unit name, not unique keys (from Beaks.txt)
+    currentTab = "upgrade",
+    lastUpgradeTime = {},
+    guiVisible = true,
+    isDeleteMode = false, -- Changed from deleteMode to match Beaks.txt
+    selectedForDeletion = {},
+    knownUnits = {}, -- Added from Beaks.txt
+    lastUnitCount = 0 -- Added from Beaks.txt
+}
+
+-- Utility Functions
+local function getAllUnits()
+    local units = {}
+    local entities = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Entities")
+    if not entities then return {} end
+    
+    for _, unit in ipairs(entities:GetChildren()) do
+        if unit:IsA("Model") and string.sub(unit.Name, 1, 5) == "unit_" and unit:FindFirstChild("OwnedIndicator") then
+            local id = unit:GetAttribute("ID")
+            if id and typeof(id) == "number" then
+                table.insert(units, {Name = unit.Name, ID = id, Model = unit})
+            end
+        end
+    end
+    return units
+end
+
+-- Updated detectNewPlacements function from Beaks.txt
+local function detectNewPlacements()
+    local currentUnits = getAllUnits()
+    
+    if #currentUnits > state.lastUnitCount then
+        for _, unit in ipairs(currentUnits) do
+            if not state.knownUnits[unit.ID] then
+                -- Only record if we don't already have this unit type recorded
+                if not state.recordedUnits[unit.Name] then
+                    local model = unit.Model
+                    local primaryPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model:FindFirstChild("Part") or model.PrimaryPart
+                    
+                    if primaryPart then
+                        state.recordedUnits[unit.Name] = {
+                            name = unit.Name,
+                            position = primaryPart.Position,
+                            cframe = primaryPart.CFrame,
+                            displayName = unit.Name:gsub("unit_", ""):gsub("_", " "):upper()
+                        }
+                        
+                        print("📍 Recorded new unit type:", unit.Name, "at position:", primaryPart.Position)
+                        updatePlacementList() -- Update the list when new unit is recorded
+                    end
+                end
+                state.knownUnits[unit.ID] = true
+            end
+        end
+    end
+    state.lastUnitCount = #currentUnits
+end
+
+local function manageVisualBoxes()
+    for id, box in pairs(state.visualBoxes) do
+        box:Destroy()
+    end
+    state.visualBoxes = {}
+    
+    local units = getAllUnits()
+    for _, unit in ipairs(units) do
+        if state.upgradeAll or state.selectedUnits[unit.ID] then
+            local humanoidRootPart = unit.Model:FindFirstChild("HumanoidRootPart") or unit.Model:FindFirstChild("Torso") or unit.Model:FindFirstChild("Part")
+            if humanoidRootPart then
+                local box = Instance.new("SelectionBox")
+                box.Adornee = unit.Model
+                box.Color3 = Color3.fromRGB(0, 255, 127)
+                box.LineThickness = 0.15
+                box.Transparency = 0.5
+                box.Parent = workspace
+                state.visualBoxes[unit.ID] = box
+            end
+        end
+    end
+end
+
+-- Mobile Dragging Function
+local function makeDraggable(frame)
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    local function onInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end
+    
+    local function onInputChanged(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
+    
+    local function onInputEnded(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end
+    
+    frame.InputBegan:Connect(onInputBegan)
+    UserInputService.InputChanged:Connect(onInputChanged)
+    UserInputService.InputEnded:Connect(onInputEnded)
+end
+
+-- Create rounded corner
+local function addCorner(obj, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 8)
+    corner.Parent = obj
+end
+
+-- Create gradient
+local function addGradient(obj, color1, color2)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, color1),
+        ColorSequenceKeypoint.new(1, color2)
+    })
+    gradient.Rotation = 90
+    gradient.Parent = obj
+end
+
+-- Toggle Button GUI
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "ToggleButton"
+toggleGui.ResetOnSpawn = false
+toggleGui.Parent = playerGui
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 50, 0, 50)
+toggleButton.Position = UDim2.new(1, -60, 0.5, -25)
+toggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+toggleButton.BorderSizePixel = 0
+toggleButton.Text = "AU"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 16
+toggleButton.Parent = toggleGui
+
+addCorner(toggleButton, 25)
+addGradient(toggleButton, Color3.fromRGB(60, 60, 70), Color3.fromRGB(40, 40, 50))
+
+-- Make toggle button draggable
+makeDraggable(toggleButton)
+
+-- Main GUI
+local mainGui = Instance.new("ScreenGui")
+mainGui.Name = "AutoUpgrader"
+mainGui.ResetOnSpawn = false
+mainGui.Parent = playerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 420)
+mainFrame.Position = UDim2.new(0, 50, 0, 50)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = mainGui
+
+addCorner(mainFrame, 12)
+addGradient(mainFrame, Color3.fromRGB(30, 30, 40), Color3.fromRGB(20, 20, 30))
+
+-- Shadow effect
+local shadow = Instance.new("Frame")
+shadow.Size = UDim2.new(1, 6, 1, 6)
+shadow.Position = UDim2.new(0, -3, 0, -3)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.7
+shadow.BorderSizePixel = 0
+shadow.ZIndex = -1
+shadow.Parent = mainFrame
+addCorner(shadow, 12)
+
+-- Make main frame draggable
+makeDraggable(mainFrame)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "🚀 Auto Upgrader & Placer"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = mainFrame
+
+-- Tab Buttons
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(1, -20, 0, 35)
+tabFrame.Position = UDim2.new(0, 10, 0, 40)
+tabFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+tabFrame.BorderSizePixel = 0
+tabFrame.Parent = mainFrame
+addCorner(tabFrame, 8)
+
+local upgradeTab = Instance.new("TextButton")
+upgradeTab.Size = UDim2.new(0.5, -2, 1, -4)
+upgradeTab.Position = UDim2.new(0, 2, 0, 2)
+upgradeTab.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
+upgradeTab.BorderSizePixel = 0
+upgradeTab.Text = "⬆️ UPGRADE"
+upgradeTab.TextColor3 = Color3.new(1, 1, 1)
+upgradeTab.Font = Enum.Font.GothamBold
+upgradeTab.TextSize = 12
+upgradeTab.Parent = tabFrame
+addCorner(upgradeTab, 6)
+
+local placementTab = Instance.new("TextButton")
+placementTab.Size = UDim2.new(0.5, -2, 1, -4)
+placementTab.Position = UDim2.new(0.5, 2, 0, 2)
+placementTab.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+placementTab.BorderSizePixel = 0
+placementTab.Text = "📍 PLACEMENT"
+placementTab.TextColor3 = Color3.fromRGB(200, 200, 200)
+placementTab.Font = Enum.Font.Gotham
+placementTab.TextSize = 12
+placementTab.Parent = tabFrame
+addCorner(placementTab, 6)
+
+-- Content Frame
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -20, 0, 335)
+contentFrame.Position = UDim2.new(0, 10, 0, 80)
+contentFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+contentFrame.BorderSizePixel = 0
+contentFrame.Parent = mainFrame
+addCorner(contentFrame, 8)
+
+-- Upgrade Content
+local upgradeContent = Instance.new("Frame")
+upgradeContent.Size = UDim2.new(1, 0, 1, 0)
+upgradeContent.BackgroundTransparency = 1
+upgradeContent.Parent = contentFrame
+
+local toggleUpgrade = Instance.new("TextButton")
+toggleUpgrade.Size = UDim2.new(0.6, -5, 0, 35)
+toggleUpgrade.Position = UDim2.new(0, 8, 0, 8)
+toggleUpgrade.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+toggleUpgrade.BorderSizePixel = 0
+toggleUpgrade.Text = "🔴 OFF"
+toggleUpgrade.TextColor3 = Color3.new(1, 1, 1)
+toggleUpgrade.Font = Enum.Font.GothamBold
+toggleUpgrade.TextSize = 12
+toggleUpgrade.Parent = upgradeContent
+addCorner(toggleUpgrade, 6)
+
+local upgradeAll = Instance.new("TextButton")
+upgradeAll.Size = UDim2.new(0.4, -5, 0, 35)
+upgradeAll.Position = UDim2.new(0.6, 3, 0, 8)
+upgradeAll.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+upgradeAll.BorderSizePixel = 0
+upgradeAll.Text = "All: OFF"
+upgradeAll.TextColor3 = Color3.new(1, 1, 1)
+upgradeAll.Font = Enum.Font.Gotham
+upgradeAll.TextSize = 11
+upgradeAll.Parent = upgradeContent
+addCorner(upgradeAll, 6)
+
+local upgradeScroll = Instance.new("ScrollingFrame")
+upgradeScroll.Size = UDim2.new(1, -16, 0, 280)
+upgradeScroll.Position = UDim2.new(0, 8, 0, 48)
+upgradeScroll.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+upgradeScroll.BorderSizePixel = 0
+upgradeScroll.ScrollBarThickness = 4
+upgradeScroll.ScrollBarImageColor3 = Color3.fromRGB(70, 130, 255)
+upgradeScroll.Parent = upgradeContent
+addCorner(upgradeScroll, 6)
+
+-- Placement Content
+local placementContent = Instance.new("Frame")
+placementContent.Size = UDim2.new(1, 0, 1, 0)
+placementContent.BackgroundTransparency = 1
+placementContent.Visible = false
+placementContent.Parent = contentFrame
+
+local placementInfo = Instance.new("TextLabel")
+placementInfo.Size = UDim2.new(1, -16, 0, 25)
+placementInfo.Position = UDim2.new(0, 8, 0, 8)
+placementInfo.BackgroundTransparency = 1
+placementInfo.Text = "💡 Place units manually first to record them!"
+placementInfo.TextColor3 = Color3.fromRGB(150, 150, 160)
+placementInfo.Font = Enum.Font.Gotham
+placementInfo.TextSize = 10
+placementInfo.TextWrapped = true
+placementInfo.Parent = placementContent
+
+local deleteToggle = Instance.new("TextButton")
+deleteToggle.Size = UDim2.new(0.5, -4, 0, 30)
+deleteToggle.Position = UDim2.new(0, 8, 0, 35)
+deleteToggle.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+deleteToggle.BorderSizePixel = 0
+deleteToggle.Text = "🗑️ Delete: OFF"
+deleteToggle.TextColor3 = Color3.new(1, 1, 1)
+deleteToggle.Font = Enum.Font.Gotham
+deleteToggle.TextSize = 10
+deleteToggle.Parent = placementContent
+addCorner(deleteToggle, 6)
+
+local deleteSelected = Instance.new("TextButton")
+deleteSelected.Size = UDim2.new(0.5, -4, 0, 30)
+deleteSelected.Position = UDim2.new(0.5, 4, 0, 35)
+deleteSelected.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+deleteSelected.BorderSizePixel = 0
+deleteSelected.Text = "❌ Delete (0)"
+deleteSelected.TextColor3 = Color3.new(1, 1, 1)
+deleteSelected.Font = Enum.Font.Gotham
+deleteSelected.TextSize = 10
+deleteSelected.Visible = false
+deleteSelected.Parent = placementContent
+addCorner(deleteSelected, 6)
+
+local placementScroll = Instance.new("ScrollingFrame")
+placementScroll.Size = UDim2.new(1, -16, 0, 260)
+placementScroll.Position = UDim2.new(0, 8, 0, 70)
+placementScroll.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+placementScroll.BorderSizePixel = 0
+placementScroll.ScrollBarThickness = 4
+placementScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 130, 70)
+placementScroll.Parent = placementContent
+addCorner(placementScroll, 6)
+
+-- Functions
+local function updateUpgradeList()
+    for _, child in ipairs(upgradeScroll:GetChildren()) do
+        if child:IsA("GuiObject") then child:Destroy() end
+    end
+    
+    local units = getAllUnits()
+    local yPos = 0
+    
+    for _, unit in ipairs(units) do
+        local isSelected = state.selectedUnits[unit.ID] or state.upgradeAll
+        local displayName = unit.Name:gsub("unit_", ""):gsub("_", " "):upper()
+        
+        local unitButton = Instance.new("TextButton")
+        unitButton.Size = UDim2.new(1, -10, 0, 30)
+        unitButton.Position = UDim2.new(0, 5, 0, yPos)
+        unitButton.BackgroundColor3 = isSelected and Color3.fromRGB(60, 150, 80) or Color3.fromRGB(45, 45, 55)
+        unitButton.BorderSizePixel = 0
+        unitButton.Text = (isSelected and "✅ " or "⭕ ") .. displayName .. " (ID: " .. unit.ID .. ")"
+        unitButton.TextColor3 = Color3.new(1, 1, 1)
+        unitButton.Font = Enum.Font.Gotham
+        unitButton.TextSize = 10
+        unitButton.TextXAlignment = Enum.TextXAlignment.Left
+        unitButton.Parent = upgradeScroll
+        addCorner(unitButton, 4)
+        
+        if isSelected then
+            addGradient(unitButton, Color3.fromRGB(70, 160, 90), Color3.fromRGB(50, 140, 70))
+        end
+        
+        unitButton.MouseButton1Click:Connect(function()
+            if not state.upgradeAll then
+                state.selectedUnits[unit.ID] = not state.selectedUnits[unit.ID]
+                updateUpgradeList()
+                manageVisualBoxes()
+            end
+        end)
+        
+        yPos = yPos + 35
+    end
+    
+    upgradeScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+-- Updated updatePlacementList function using Beaks.txt logic
+local function updatePlacementList()
+    for _, child in ipairs(placementScroll:GetChildren()) do
+        if child:IsA("GuiObject") then child:Destroy() end
+    end
+    
+    local yPos = 0
+    
+    for unitName, unitData in pairs(state.recordedUnits) do
+        local isSelected = state.selectedForDeletion[unitName]
+        local buttonText = state.isDeleteMode and 
+            (isSelected and "❌ " or "🗑️ ") .. unitData.displayName or 
+            "📍 Place " .. unitData.displayName
+        local buttonColor = state.isDeleteMode and 
+            (isSelected and Color3.fromRGB(220, 60, 60) or Color3.fromRGB(80, 45, 45)) or 
+            Color3.fromRGB(70, 130, 255)
+        
+        local unitButton = Instance.new("TextButton")
+        unitButton.Size = UDim2.new(1, -10, 0, 35)
+        unitButton.Position = UDim2.new(0, 5, 0, yPos)
+        unitButton.BackgroundColor3 = buttonColor
+        unitButton.BorderSizePixel = 0
+        unitButton.Text = buttonText
+        unitButton.TextColor3 = Color3.new(1, 1, 1)
+        unitButton.Font = Enum.Font.Gotham
+        unitButton.TextSize = 11
+        unitButton.Parent = placementScroll
+        addCorner(unitButton, 4)
+        
+        if not state.isDeleteMode then
+            addGradient(unitButton, Color3.fromRGB(80, 140, 255), Color3.fromRGB(60, 120, 235))
+        end
+        
+        unitButton.MouseButton1Click:Connect(function()
+            if state.isDeleteMode then
+                state.selectedForDeletion[unitName] = not state.selectedForDeletion[unitName]
+                updatePlacementList()
+                
+                local count = 0
+                for _, selected in pairs(state.selectedForDeletion) do
+                    if selected then count = count + 1 end
+                end
+                deleteSelected.Text = "❌ Delete (" .. count .. ")"
+            else
+                local success, err = pcall(function()
+                    PlaceUnit:InvokeServer(unitData.name, {
+                        Valid = true,
+                        Rotation = 0,
+                        CF = unitData.cframe,
+                        Position = unitData.position
+                    })
+                    print("📍 Placed unit:", unitData.name, "at position:", unitData.position)
+                end)
+                
+                if not success then
+                    warn("❌ Failed to place unit", unitData.name, ":", err)
+                end
+            end
+        end)
+        
+        yPos = yPos + 40
+    end
+    
+    placementScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+local function switchTab(tab)
+    state.currentTab = tab
+    if tab == "upgrade" then
+        upgradeTab.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
+        upgradeTab.TextColor3 = Color3.new(1, 1, 1)
+        placementTab.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        placementTab.TextColor3 = Color3.fromRGB(200, 200, 200)
+        upgradeContent.Visible = true
+        placementContent.Visible = false
+        updateUpgradeList()
+    else
+        upgradeTab.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        upgradeTab.TextColor3 = Color3.fromRGB(200, 200, 200)
+        placementTab.BackgroundColor3 = Color3.fromRGB(255, 130, 70)
+        placementTab.TextColor3 = Color3.new(1, 1, 1)
+        upgradeContent.Visible = false
+        placementContent.Visible = true
+        updatePlacementList()
+    end
+end
+
+-- Button Events
+toggleButton.MouseButton1Click:Connect(function()
+    state.guiVisible = not state.guiVisible
+    mainFrame.Visible = state.guiVisible
+    
+    toggleButton.Text = state.guiVisible and "AU" or "▶"
+    toggleButton.BackgroundColor3 = state.guiVisible and Color3.fromRGB(45, 45, 55) or Color3.fromRGB(70, 130, 255)
+end)
+
+toggleUpgrade.MouseButton1Click:Connect(function()
+    state.isAutoUpgrading = not state.isAutoUpgrading
+    toggleUpgrade.Text = state.isAutoUpgrading and "🟢 ON" or "🔴 OFF"
+    toggleUpgrade.BackgroundColor3 = state.isAutoUpgrading and Color3.fromRGB(60, 200, 80) or Color3.fromRGB(220, 60, 60)
+end)
+
+upgradeAll.MouseButton1Click:Connect(function()
+    state.upgradeAll = not state.upgradeAll
+    upgradeAll.Text = "All: " .. (state.upgradeAll and "ON" or "OFF")
+    upgradeAll.BackgroundColor3 = state.upgradeAll and Color3.fromRGB(60, 150, 80) or Color3.fromRGB(55, 55, 65)
+    if state.upgradeAll then state.selectedUnits = {} end
+    updateUpgradeList()
+    manageVisualBoxes()
+end)
+
+-- Updated deleteToggle using Beaks.txt logic
+deleteToggle.MouseButton1Click:Connect(function()
+    state.isDeleteMode = not state.isDeleteMode
+    state.selectedForDeletion = {}
+    
+    deleteToggle.Text = "🗑️ Delete: " .. (state.isDeleteMode and "ON" or "OFF")
+    deleteToggle.BackgroundColor3 = state.isDeleteMode and Color3.fromRGB(220, 60, 60) or Color3.fromRGB(55, 55, 65)
+    deleteSelected.Visible = state.isDeleteMode
+    deleteSelected.Text = "❌ Delete (0)"
+    
+    updatePlacementList()
+end)
+
+-- Updated deleteSelected using Beaks.txt logic
+deleteSelected.MouseButton1Click:Connect(function()
+    local deletedCount = 0
+    for unitName, isSelected in pairs(state.selectedForDeletion) do
+        if isSelected and state.recordedUnits[unitName] then
+            print("🗑️ Deleted recorded unit:", state.recordedUnits[unitName].name)
+            state.recordedUnits[unitName] = nil
+            deletedCount = deletedCount + 1
+        end
+    end
+    
+    state.selectedForDeletion = {}
+    deleteSelected.Text = "❌ Delete (0)"
+    updatePlacementList()
+    
+    if deletedCount > 0 then
+        print("✅ Deleted", deletedCount, "recorded units")
+    end
+end)
+
+upgradeTab.MouseButton1Click:Connect(function() switchTab("upgrade") end)
+placementTab.MouseButton1Click:Connect(function() switchTab("placement") end)
+
+-- Main Loop
+local function shouldUpgradeUnit(unit)
+    if not state.isAutoUpgrading then return false end
+    
+    local currentTime = tick()
+    local lastTime = state.lastUpgradeTime[unit.ID] or 0
+    
+    if currentTime - lastTime < 2 then return false end
+    
+    return state.upgradeAll or state.selectedUnits[unit.ID]
+end
+
+local upgradeConnection = RunService.Heartbeat:Connect(function()
+    if not state.isAutoUpgrading then return end
+    
+    local units = getAllUnits()
+    for _, unit in ipairs(units) do
+        if shouldUpgradeUnit(unit) then
+            local success, err = pcall(function()
+                UpgradeUnit:InvokeServer(unit.ID)
+                state.lastUpgradeTime[unit.ID] = tick()
+                print("⬆️ Upgraded:", unit.Name, "ID:", unit.ID)
+            end)
+            
+            if not success then
+                warn("❌ Failed to upgrade:", unit.ID, err)
+            end
+        end
+    end
+end)
+
+-- Updated main loop using Beaks.txt logic
+local updateConnection = RunService.Heartbeat:Connect(function()
+    if tick() % 1 < 0.016 then
+        if state.currentTab == "upgrade" then
+            updateUpgradeList()
+        else
+            updatePlacementList()
+        end
+        manageVisualBoxes()
+        detectNewPlacements()
+    end
+end)
+
+-- Initialize
+switchTab("upgrade")
+detectNewPlacements()
+
+-- Cleanup
+mainGui.AncestryChanged:Connect(function()
+    if not mainGui.Parent then
+        if upgradeConnection then upgradeConnection:Disconnect() end
+        if updateConnection then updateConnection:Disconnect() end
+        for _, box in pairs(state.visualBoxes) do box:Destroy() end
+    end
+end)
+
+print("🎨 Modern Auto Upgrader & Placer loaded with Beaks placement system!")
+print("📱 Mobile-friendly with modern dark theme!")
+print("🗑️ Improved placement system from Beaks.txt!")
+print("⚡ Only records one unit type per name!")
+print("🎯 Toggle button (AU) to show/hide main GUI")
+print("📍 Place units manually first to record them for quick placement!")
+print("🔄 Each unit type is recorded only once until deleted!")
