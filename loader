@@ -1,14 +1,10 @@
 -- Enhanced Game Loader UI with dark mode, search, drag, and animations
 local allowedGames = {
-    ["Hunters"] = {
-        url = "https://raw.githubusercontent.com/JiwooAXH/hunters/main/loader",
-        ids = {72992062125248}
-    },
     ["The Forge"] = {
         url = "https://lunor.dev/loader",
         ids = {}
     },
-    ["Volleyball Legends"] = {
+    ["Volleyball Legends (OUTDATED)"] = {
         url = "https://pastefy.app/CPg7BawS/raw",
         ids = {}
     },
@@ -16,15 +12,7 @@ local allowedGames = {
         url = "https://pastefy.app/69Dfd9M1/raw",
         ids = {}
     },
-    ["Basketball: Zero (BETA)"] = {
-        url = "https://pastes.io/raw/basketball-zero",
-        ids = {}
-    },
-    ["Bubble Gum Simulator: INFINITE"] = {
-        url = "https://pastes.io/raw/bubble-gum-sim-inf",
-        ids = {85896571713843}
-    },
-    ["Anime Ranger X"] = {
+    ["Anime Ranger X (OUTDATED)"] = {
         url = "https://pastefy.app/DWCHu1Ne/raw",
         ids = {}
     },
@@ -32,7 +20,7 @@ local allowedGames = {
         url = "https://lunor.dev/loader",
         ids = {}
     },
-    ["Dig ( currently not working.)"] = {
+    ["Dig (not working.)"] = {
         url = "xhttps://raw.githubusercontent.com/3x3x3x3x3/rt/refs/heads/main/Protected_4660484644500636.lua",
         ids = {}
     }
