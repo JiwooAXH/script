@@ -4,9 +4,9 @@ local allowedGames = {
         url = "https://raw.githubusercontent.com/JiwooAXH/hunters/main/loader",
         ids = {72992062125248}
     },
-    ["Blue Lock: Rivals"] = {
-        url = "https://pastebin.com/raw/DayWmzBh",
-        ids = {18668065416}
+    ["The Forge"] = {
+        url = "https://lunor.dev/loader",
+        ids = {}
     },
     ["Volleyball Legends"] = {
         url = "https://pastefy.app/CPg7BawS/raw",
