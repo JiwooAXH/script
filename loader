@@ -1,7 +1,7 @@
 -- Enhanced Game Loader UI with dark mode, search, drag, and animations
 local allowedGames = {
-    ["The Forge"] = {
-        url = "https://lunor.dev/loader",
+    ["zzz"] = {
+        url = "",
         ids = {}
     },
     ["Volleyball Legends (OUTDATED)"] = {
@@ -16,11 +16,11 @@ local allowedGames = {
         url = "https://pastefy.app/DWCHu1Ne/raw",
         ids = {}
     },
-    ["Grow a Garden"] = {
-        url = "https://lunor.dev/loader",
+    ["Grow a Garden (OUTDATED)"] = {
+        url = "",
         ids = {}
     },
-    ["Dig (not working.)"] = {
+    ["Dig (NOT WORKING)"] = {
         url = "xhttps://raw.githubusercontent.com/3x3x3x3x3/rt/refs/heads/main/Protected_4660484644500636.lua",
         ids = {}
     }
