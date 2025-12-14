@@ -1,7 +1,7 @@
 -- Enhanced Game Loader UI with dark mode, search, drag, and animations
 local allowedGames = {
-    ["zzz"] = {
-        url = "",
+    ["The Forge"] = {
+        url = "https://raw.githubusercontent.com/kaisenlmao/loader/refs/heads/main/chiyo.lua",
         ids = {}
     },
     ["Volleyball Legends (OUTDATED)"] = {
