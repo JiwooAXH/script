@@ -19,8 +19,8 @@ local allowedGames = {
         url = "",
         ids = {}
     },
-    ["Dig (NOT WORKING)"] = {
-        url = "xhttps://raw.githubusercontent.com/3x3x3x3x3/rt/refs/heads/main/Protected_4660484644500636.lua",
+    ["Anime Final Quest"] = {
+        url = "https://pastefy.app/DCyJkNVA/raw",
         ids = {}
     }
 }
