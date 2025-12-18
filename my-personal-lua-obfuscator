@@ -1,4 +1,4 @@
--- Enhanced XOR Obfuscator GUI (Fixed)
+-- Advanced Multi-Layer Obfuscator GUI (Fixed)
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local UIS = game:GetService("UserInputService")
@@ -50,7 +50,7 @@ inputBox.TextSize = 15
 inputBox.TextColor3 = labelColor
 inputBox.TextWrapped = true
 inputBox.Text = ""
-inputBox.PlaceholderText = "-- Paste your Lua script here\n\nMade by: Yuki (Enhanced XOR)"
+inputBox.PlaceholderText = "-- Paste your Lua script here\n\nMade by: Yuki (Advanced Multi-Layer)"
 inputBox.TextEditable = true
 inputBox.Active = true
 inputBox.Selectable = true
@@ -67,7 +67,7 @@ confirmButton.TextSize = 15
 Instance.new("UICorner", confirmButton).CornerRadius = UDim.new(0, 8)
 
 local resultLabel = Instance.new("TextLabel", MainFrame)
-resultLabel.Text = "Obfuscated (XOR Encrypted)"
+resultLabel.Text = "Obfuscated (Multi-Layer Encrypted)"
 resultLabel.Size = UDim2.new(1, 0, 0, 30)
 resultLabel.Position = UDim2.new(0, 0, 0, 205)
 resultLabel.BackgroundTransparency = 1
@@ -118,45 +118,79 @@ copyButton.TextColor3 = highlightColor
 copyButton.TextSize = 15
 Instance.new("UICorner", copyButton).CornerRadius = UDim.new(0, 8)
 
-local function generateKey()
-	local key = {}
-	math.randomseed(tick())
-	for i = 1, 16 do
-		key[i] = math.random(1, 255)
+local function generateVarName()
+	local chars = "abcdefghijklmnopqrstuvwxyz"
+	local name = ""
+	for i = 1, math.random(6, 10) do
+		name = name .. chars:sub(math.random(1, #chars), math.random(1, #chars))
 	end
-	return key
-end
-
-local function xorEncrypt(text, key)
-	local result = {}
-	local keyLen = #key
-	for i = 1, #text do
-		local byte = string.byte(text:sub(i, i))
-		local keyByte = key[((i - 1) % keyLen) + 1]
-		table.insert(result, bit32.bxor(byte, keyByte))
-	end
-	return result
+	return "_" .. name .. math.random(100, 999)
 end
 
 local function obfuscateScript(scriptText)
-	local key = generateKey()
-	local encrypted = xorEncrypt(scriptText, key)
+	math.randomseed(tick())
 	
-	local varNames = {
-		"_" .. string.char(math.random(65, 90)) .. math.random(1000, 9999),
-		"_" .. string.char(math.random(65, 90)) .. math.random(1000, 9999),
-		"_" .. string.char(math.random(65, 90)) .. math.random(1000, 9999)
-	}
+	local key = {}
+	for i = 1, 24 do
+		key[i] = math.random(1, 255)
+	end
+	
+	local encrypted = {}
+	for i = 1, #scriptText do
+		local byte = string.byte(scriptText:sub(i, i))
+		local keyByte = key[((i - 1) % #key) + 1]
+		local xorResult = bit32.bxor(byte, keyByte)
+		local rotated = bit32.lrotate(xorResult, i % 7)
+		encrypted[i] = rotated
+	end
+	
+	local indices = {}
+	for i = 1, #encrypted do
+		indices[i] = i
+	end
+	for i = #indices, 2, -1 do
+		local j = math.random(i)
+		indices[i], indices[j] = indices[j], indices[i]
+	end
+	
+	local shuffled = {}
+	for i = 1, #indices do
+		shuffled[i] = encrypted[indices[i]]
+	end
+	
+	local v1 = generateVarName()
+	local v2 = generateVarName()
+	local v3 = generateVarName()
+	local v4 = generateVarName()
+	local v5 = generateVarName()
+	local v6 = generateVarName()
 	
 	local keyStr = table.concat(key, ",")
-	local dataStr = table.concat(encrypted, ",")
+	local dataStr = table.concat(shuffled, ",")
+	local orderStr = table.concat(indices, ",")
 	
-	return string.format([[local %s={%s}local %s={%s}local function %s(d,k)local r={}for i=1,#d do r[i]=string.char(bit32.bxor(d[i],k[((i-1)%%#k)+1]))end return table.concat(r)end loadstring(%s(%s,%s))()]], 
-		varNames[1], keyStr,
-		varNames[2], dataStr,
-		varNames[3],
-		varNames[3], varNames[2], varNames[1]
-	)
+	local loader = "local " .. v1 .. "={" .. keyStr .. "};"
+	loader = loader .. "local " .. v2 .. "={" .. dataStr .. "};"
+	loader = loader .. "local " .. v3 .. "={" .. orderStr .. "};"
+	loader = loader .. "local function " .. v4 .. "(d,o)"
+	loader = loader .. " local u={}"
+	loader = loader .. " for i=1,#o do"
+	loader = loader .. "  u[o[i]]=d[i]"
+	loader = loader .. " end"
+	loader = loader .. " return u"
+	loader = loader .. " end;"
+	loader = loader .. "local function " .. v5 .. "(e,k)"
+	loader = loader .. " local r={}"
+	loader = loader .. " for i=1,#e do"
+	loader = loader .. "  local rt=bit32.rrotate(e[i],i%7)"
+	loader = loader .. "  r[i]=string.char(bit32.bxor(rt,k[((i-1)%#k)+1]))"
+	loader = loader .. " end"
+	loader = loader .. " return table.concat(r)"
+	loader = loader .. " end;"
+	loader = loader .. "local " .. v6 .. "=" .. v4 .. "(" .. v2 .. "," .. v3 .. ");"
+	loader = loader .. "loadstring(" .. v5 .. "(" .. v6 .. "," .. v1 .. "))()"
+	
+	return loader
 end
 
 confirmButton.MouseButton1Click:Connect(function()
