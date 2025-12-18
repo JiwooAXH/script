@@ -1,19 +1,17 @@
--- Lua Obfuscator GUI with Enhanced Features (Mobile-Centered Fix)
+-- Enhanced XOR Obfuscator GUI (Fixed)
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
--- ScreenGui
 local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 ScreenGui.Name = "ObfuscatorGUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true -- FIX: ensure center on mobile
+ScreenGui.IgnoreGuiInset = true
 
--- Main Frame (Centered)
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 500, 0, 400)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0) -- true center
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
@@ -26,14 +24,12 @@ MainFrame.Name = "MainObfuscator"
 local corner = Instance.new("UICorner", MainFrame)
 corner.CornerRadius = UDim.new(0, 12)
 
--- Fonts & Colors
 local font = Enum.Font.Gotham
 local labelColor = Color3.fromRGB(240, 240, 240)
 local boxColor = Color3.fromRGB(30, 30, 30)
 local buttonColor = Color3.fromRGB(50, 50, 50)
 local highlightColor = Color3.fromRGB(90, 170, 255)
 
--- Labels, Input, Output Boxes
 local topLabel = Instance.new("TextLabel", MainFrame)
 topLabel.Text = "Put your Script here"
 topLabel.Size = UDim2.new(1, 0, 0, 30)
@@ -54,7 +50,7 @@ inputBox.TextSize = 15
 inputBox.TextColor3 = labelColor
 inputBox.TextWrapped = true
 inputBox.Text = ""
-inputBox.PlaceholderText = "-- Paste your Lua script here\n\nMade by: Yuki"
+inputBox.PlaceholderText = "-- Paste your Lua script here\n\nMade by: Yuki (Enhanced XOR)"
 inputBox.TextEditable = true
 inputBox.Active = true
 inputBox.Selectable = true
@@ -71,7 +67,7 @@ confirmButton.TextSize = 15
 Instance.new("UICorner", confirmButton).CornerRadius = UDim.new(0, 8)
 
 local resultLabel = Instance.new("TextLabel", MainFrame)
-resultLabel.Text = "Obfuscated"
+resultLabel.Text = "Obfuscated (XOR Encrypted)"
 resultLabel.Size = UDim2.new(1, 0, 0, 30)
 resultLabel.Position = UDim2.new(0, 0, 0, 205)
 resultLabel.BackgroundTransparency = 1
@@ -96,7 +92,6 @@ outputBox.Active = true
 outputBox.Selectable = true
 Instance.new("UICorner", outputBox).CornerRadius = UDim.new(0, 8)
 
--- Additional buttons outside the text box (Clear All and Copy to Clipboard)
 local bottomButtonFrame = Instance.new("Frame", MainFrame)
 bottomButtonFrame.Size = UDim2.new(1, 0, 0, 50)
 bottomButtonFrame.Position = UDim2.new(0, 0, 1, -50)
@@ -123,28 +118,45 @@ copyButton.TextColor3 = highlightColor
 copyButton.TextSize = 15
 Instance.new("UICorner", copyButton).CornerRadius = UDim.new(0, 8)
 
--- Obfuscation logic without comments
-local function obfuscateScript(scriptText)
-	local result = {}
-	for i = 1, #scriptText do
-		table.insert(result, string.byte(scriptText:sub(i, i)))
+local function generateKey()
+	local key = {}
+	math.randomseed(tick())
+	for i = 1, 16 do
+		key[i] = math.random(1, 255)
 	end
-
-	return [[
-local chars = { ]] .. table.concat(result, ", ") .. [[ }
-local function fromChars(tbl)
- local s = {}
- for i = 1, #tbl do
-  s[i] = string.char(tbl[i])
- end
- return table.concat(s)
+	return key
 end
 
-local encoded = string.reverse(fromChars(chars))
-local finalURL = string.reverse(encoded)
+local function xorEncrypt(text, key)
+	local result = {}
+	local keyLen = #key
+	for i = 1, #text do
+		local byte = string.byte(text:sub(i, i))
+		local keyByte = key[((i - 1) % keyLen) + 1]
+		table.insert(result, bit32.bxor(byte, keyByte))
+	end
+	return result
+end
 
-loadstring(finalURL)()
-]]
+local function obfuscateScript(scriptText)
+	local key = generateKey()
+	local encrypted = xorEncrypt(scriptText, key)
+	
+	local varNames = {
+		"_" .. string.char(math.random(65, 90)) .. math.random(1000, 9999),
+		"_" .. string.char(math.random(65, 90)) .. math.random(1000, 9999),
+		"_" .. string.char(math.random(65, 90)) .. math.random(1000, 9999)
+	}
+	
+	local keyStr = table.concat(key, ",")
+	local dataStr = table.concat(encrypted, ",")
+	
+	return string.format([[local %s={%s}local %s={%s}local function %s(d,k)local r={}for i=1,#d do r[i]=string.char(bit32.bxor(d[i],k[((i-1)%%#k)+1]))end return table.concat(r)end loadstring(%s(%s,%s))()]], 
+		varNames[1], keyStr,
+		varNames[2], dataStr,
+		varNames[3],
+		varNames[3], varNames[2], varNames[1]
+	)
 end
 
 confirmButton.MouseButton1Click:Connect(function()
@@ -155,18 +167,15 @@ confirmButton.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Clear All Button functionality
 clearButton.MouseButton1Click:Connect(function()
 	inputBox.Text = ""
 	outputBox.Text = ""
 end)
 
--- Copy to Clipboard Button functionality
 copyButton.MouseButton1Click:Connect(function()
 	setclipboard(outputBox.Text)
 end)
 
--- Save and Load Functionality (Using DataStore for simplicity)
 local DataStoreService = game:GetService("DataStoreService")
 local scriptDataStore = DataStoreService:GetDataStore("LuaObfuscatorDataStore")
 
@@ -193,7 +202,6 @@ local function loadScript()
 	end
 end
 
--- Draggable GUI logic with smooth transitions
 local dragging, dragInput, dragStart, startPos
 
 local function update(input)
@@ -228,12 +236,10 @@ UIS.InputChanged:Connect(function(input)
 	end
 end)
 
--- Fade-in animation for the MainFrame
 local fadeInTween = TweenService:Create(MainFrame, TweenInfo.new(0.5), {Transparency = 0})
 MainFrame.BackgroundTransparency = 1
 fadeInTween:Play()
 
--- Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 30, 0, 30)
 toggleButton.Position = UDim2.new(1, -40, 0.5, -15)
@@ -253,13 +259,4 @@ toggleButton.MouseButton1Click:Connect(function()
 	MainFrame.Visible = guiVisible
 end)
 
--- Smooth fade out on hide (if desired)
-toggleButton.MouseButton1Click:Connect(function()
-	local fadeOutTween = TweenService:Create(MainFrame, TweenInfo.new(0.5), {Transparency = 1})
-	fadeOutTween:Play()
-	wait(0.5) -- Wait for the fade out to finish
-	MainFrame.Visible = guiVisible
-end)
-
--- Add this to load the script at the start
 loadScript()
