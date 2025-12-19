@@ -15,8 +15,8 @@ local allowedGames = {
         url = "https://pastefy.app/DWCHu1Ne/raw",
         ids = {}
     },
-    ["Grow a Garden (OUTDATED)"] = {
-        url = "",
+    ["Blind Shot"] = {
+        url = "https://pastefy.app/p4FbXTbk/raw",
         ids = {}
     },
     ["Anime Final Quest"] = {
