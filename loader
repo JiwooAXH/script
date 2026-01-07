@@ -1,15 +1,15 @@
 local allowedGames = {
     ["The Forge"] = {
         url = "https://raw.githubusercontent.com/kaisenlmao/loader/refs/heads/main/chiyo.lua",
-        ids = {}
+        ids = {1}
     },
     ["Volleyball Legends (OUTDATED)"] = {
         url = "https://pastefy.app/CPg7BawS/raw",
-        ids = {}
+        ids = {1}
     },
     ["Blair"] = {
         url = "https://pastefy.app/69Dfd9M1/raw",
-        ids = {}
+        ids = {1}
     },
     ["Anime Ranger X (OUTDATED)"] = {
         url = "https://pastefy.app/DWCHu1Ne/raw",
@@ -17,11 +17,11 @@ local allowedGames = {
     },
     ["Blind Shot"] = {
         url = "https://pastefy.app/p4FbXTbk/raw",
-        ids = {}
+        ids = {1}
     },
     ["Anime Final Quest"] = {
         url = "https://pastefy.app/DCyJkNVA/raw",
-        ids = {}
+        ids = {1}
     }
 }
 
